@@ -1,13 +1,13 @@
-(defpackage #:json-parser/json-parser-tests
+(defpackage #:tokyo.tojo.json-parser/json-parser-tests
   (:use #:coalton
         #:coalton-library/builtin
         #:coalton-library/classes
-        #:json-parser/json-parser)
+        #:tokyo.tojo.json-parser/json-parser)
   (:local-nicknames
    (#:map #:coalton-library/ord-map)
    (#:result #:coalton-library/result)))
 
-(in-package #:json-parser/json-parser-tests)
+(in-package #:tokyo.tojo.json-parser/json-parser-tests)
 
 (5am:def-suite json-parser-suite)
 (5am:in-suite json-parser-suite)

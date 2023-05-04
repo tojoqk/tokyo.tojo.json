@@ -1,4 +1,4 @@
-(cl:defpackage #:json-parser/parser
+(cl:defpackage #:tokyo.tojo.json-parser/parser
   (:use #:coalton
         #:coalton-library/builtin
         #:coalton-library/classes)
@@ -12,7 +12,7 @@
            #:make-stream!
            #:run-parser!))
 
-(cl:in-package #:json-parser/parser)
+(cl:in-package #:tokyo.tojo.json-parser/parser)
 
 (coalton-toplevel
   (define-type Stream (%Stream (Optional Char) (iter:Iterator Char)))

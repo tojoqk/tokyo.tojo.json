@@ -1,9 +1,9 @@
-(cl:defpackage #:json-parser/json-parser
+(cl:defpackage #:tokyo.tojo.json-parser/json-parser
   (:use #:coalton
         #:coalton-library/builtin
         #:coalton-library/classes
-        #:json-parser/parser)
-  (:nicknames #:json-parser)
+        #:tokyo.tojo.json-parser/parser)
+  (:nicknames #:tokyo.tojo.json-parser)
   (:local-nicknames
    (#:map #:coalton-library/ord-map)
    (#:iter #:coalton-library/iterator)
@@ -21,7 +21,7 @@
            #:parse-json
            #:parse-json!))
 
-(cl:in-package #:json-parser/json-parser)
+(cl:in-package #:tokyo.tojo.json-parser/json-parser)
 
 (coalton-toplevel
   (define-type JSON-Number

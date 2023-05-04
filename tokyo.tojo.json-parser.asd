@@ -1,4 +1,4 @@
-(asdf:defsystem #:json-parser
+(asdf:defsystem #:tokyo.tojo.json-parser
   :description "JSON parser"
   :author "Masaya Tojo"
   :license  "BSD"
@@ -8,12 +8,12 @@
   :components ((:file "parser")
                (:file "json-parser")))
 
-(asdf:defsystem #:json-parser-tests
+(asdf:defsystem #:tokyo.tojo.json-parser-tests
   :description "Tests of JSON parser"
   :author "Masaya Tojo"
   :license  "BSD"
   :version "0.0.0"
-  :depends-on (#:json-parser
+  :depends-on (#:tokyo.tojo.json-parser
                #:coalton
                #:fiveam)
   :serial t
