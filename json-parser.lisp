@@ -5,21 +5,21 @@
         #:json-parser/parser)
   (:nicknames #:json-parser)
   (:local-nicknames
-   (:map #:coalton-library/ord-map)
-   (:iter #:coalton-library/iterator)
-   (:str #:coalton-library/string)
-   (:list #:coalton-library/list)
-   (:fn #:coalton-library/functions)
-   (:char #:coalton-library/char))
-  (:export JSON
-           JSON-Null
-           JSON-String
-           JSON-Number JSON-Integer JSON-Float
-           JSON-Boolean
-           JSON-Array
-           JSON-Object
-           parse-json
-           parse-json!))
+   (#:map #:coalton-library/ord-map)
+   (#:iter #:coalton-library/iterator)
+   (#:str #:coalton-library/string)
+   (#:list #:coalton-library/list)
+   (#:fn #:coalton-library/functions)
+   (#:char #:coalton-library/char))
+  (:export #:JSON
+           #:JSON-Null
+           #:JSON-String
+           #:JSON-Number #:JSON-Integer #:JSON-Float
+           #:JSON-Boolean
+           #:JSON-Array
+           #:JSON-Object
+           #:parse-json
+           #:parse-json!))
 
 (cl:in-package #:json-parser/json-parser)
 

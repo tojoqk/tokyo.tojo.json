@@ -3,14 +3,14 @@
         #:coalton-library/builtin
         #:coalton-library/classes)
   (:local-nicknames
-   (:iter #:coalton-library/iterator))
-  (:export Parser
-           Stream
-           peek-char
-           read-char
-           parser-error
-           make-stream!
-           run-parser!))
+   (#:iter #:coalton-library/iterator))
+  (:export #:Parser
+           #:Stream
+           #:peek-char
+           #:read-char
+           #:parser-error
+           #:make-stream!
+           #:run-parser!))
 
 (cl:in-package #:json-parser/parser)
 
