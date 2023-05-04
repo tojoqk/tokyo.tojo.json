@@ -1,9 +1,9 @@
-(cl:defpackage #:qkjson/qkjson
+(cl:defpackage #:json-parser/json-parser
   (:use #:coalton
         #:coalton-library/builtin
         #:coalton-library/classes
-        #:qkjson/parser)
-  (:nicknames #:qkjson)
+        #:json-parser/parser)
+  (:nicknames #:json-parser)
   (:local-nicknames
    (:map #:coalton-library/ord-map)
    (:iter #:coalton-library/iterator)
@@ -21,7 +21,7 @@
            parse-json
            parse-json!))
 
-(cl:in-package #:qkjson/qkjson)
+(cl:in-package #:json-parser/json-parser)
 
 (coalton-toplevel
   (define-type JSON-Number

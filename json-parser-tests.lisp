@@ -1,13 +1,13 @@
-(defpackage #:qkjson/qkjson-tests
+(defpackage #:json-parser/json-parser-tests
   (:use #:coalton
         #:coalton-library/builtin
         #:coalton-library/classes
-        #:qkjson/qkjson)
+        #:json-parser/json-parser)
   (:local-nicknames
    (#:map #:coalton-library/ord-map)
    (#:result #:coalton-library/result)))
 
-(in-package #:qkjson/qkjson-tests)
+(in-package #:json-parser/json-parser-tests)
 
 (5am:def-suite json-parser-suite)
 (5am:in-suite json-parser-suite)

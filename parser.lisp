@@ -1,4 +1,4 @@
-(cl:defpackage #:qkjson/parser
+(cl:defpackage #:json-parser/parser
   (:use #:coalton
         #:coalton-library/builtin
         #:coalton-library/classes)
@@ -12,7 +12,7 @@
            make-stream!
            run-parser!))
 
-(cl:in-package #:qkjson/parser)
+(cl:in-package #:json-parser/parser)
 
 (coalton-toplevel
   (define-type Stream (%Stream (Optional Char) (iter:Iterator Char)))
