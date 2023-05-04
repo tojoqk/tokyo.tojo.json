@@ -26,8 +26,8 @@
       ((%Stream (None) _) None)
       ((%Stream (Some c) iter)
        (progn
-         (let c* = (iter:next! iter))
-         (Some (Tuple c (%Stream c* iter)))))))
+         (let c_ = (iter:next! iter))
+         (Some (Tuple c (%Stream c_ iter)))))))
 
   (define-type (Parser :a) (Parser (Stream -> Result String (Tuple :a Stream))))
 
@@ -38,8 +38,8 @@
          (match p
            ((Parser parse!)
             (>>= (parse! in)
-                 (fn ((Tuple x in*))
-                   (pure (Tuple (f x) in*))))))))))
+                 (fn ((Tuple x in_))
+                   (pure (Tuple (f x) in_))))))))))
 
   (define-instance (Applicative Parser)
     (define (pure p)
@@ -51,22 +51,22 @@
          (match (Tuple p1 p2)
            ((Tuple (Parser parse1!) (Parser parse2!))
             (>>= (parse1! in)
-                 (fn ((Tuple x in*))
-                   (>>= (parse2! in*)
-                        (fn ((Tuple y in**))
-                          (pure (Tuple (op x y) in**))))))))))))
+                 (fn ((Tuple x in_))
+                   (>>= (parse2! in_)
+                        (fn ((Tuple y in__))
+                          (pure (Tuple (op x y) in__))))))))))))
 
   (define-instance (Monad Parser)
     (define (>>= (Parser parse!) f)
       (Parser
        (fn (in)
          (>>= (parse! in)
-              (fn ((Tuple x in*))
+              (fn ((Tuple x in_))
                 (match (f x)
-                  ((Parser parse*!)
-                   (>>= (parse*! in*)
-                        (fn ((Tuple x* in**))
-                          (pure (Tuple x* in**))))))))))))
+                  ((Parser parse_!)
+                   (>>= (parse_! in_)
+                        (fn ((Tuple x_ in__))
+                          (pure (Tuple x_ in__))))))))))))
 
   (declare peek-char (Parser (Optional Char)))
   (define peek-char
@@ -77,7 +77,7 @@
     (Parser
      (fn (in)
        (match (read! in)
-         ((Some (Tuple c in*)) (Ok (Tuple (Some c) in*)))
+         ((Some (Tuple c in_)) (Ok (Tuple (Some c) in_)))
          ((None) (Ok (Tuple None in)))))))
 
   (declare parser-error (String -> Parser :a))
