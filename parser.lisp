@@ -25,9 +25,8 @@
     (match p
       ((%Stream (None) _) None)
       ((%Stream (Some c) iter)
-       (progn
-         (let c_ = (iter:next! iter))
-         (Some (Tuple c (%Stream c_ iter)))))))
+       (let c_ = (iter:next! iter))
+       (Some (Tuple c (%Stream c_ iter))))))
 
   (define-type (Parser :a) (Parser (Stream -> Result String (Tuple :a Stream))))
 
