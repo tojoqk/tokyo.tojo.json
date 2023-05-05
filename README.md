@@ -77,7 +77,7 @@ JSON-PARSER-EXAMPLE> (eval "{\"left\": 10, \"op\": \"+\", \"right\": 32.0}")
 #.(SOME 42.0d0)
 JSON-PARSER-EXAMPLE> (eval "{\"left\": 10, \"op\": \"-\", \"right\": 32.0}")
 #.NONE
-JSON-PARSER-EXAMPLE> 
+JSON-PARSER-EXAMPLE>
 ```
 
 ## LICENSE
