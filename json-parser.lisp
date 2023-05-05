@@ -359,50 +359,49 @@
           (cl:declare (cl:ignore e))
           (coalton None)))))
 
-  (declare number-head-parser (Parser String))
-  (define number-head-parser
-    (let ((sign-parser
-            (fn (continue-parser)
-              (>>= (or-eof-error peek-char)
-                   (fn (c)
-                     (cond
-                       ((== c #\-)
-                        (>> (or-eof-error read-char)
-                            (liftA2 <> (pure "-") continue-parser)))
-                       (True continue-parser)))))))
-      (sign-parser
-       (>>= (or-eof-error peek-char)
-            (fn (c)
-              (cond
-                ((== c #\0)
-                 (>>= digits-parser
-                      (fn (digits)
-                        (if (== digits "0")
-                            (pure digits)
-                            (parser-error (<> "(number-parser) Unxepcted digits: "
-                                              digits))))))
-                ((digit1-9? c) digits-parser)
-                (True
-                 (parser-error (<> "(number-parser) Unexpected Char: "
-                                   (into (make-list c)))))))))))
-
   (declare number-parser (Parser JSON-Number))
   (define number-parser
-    (let ((integer-parser
-            (fn (head)
-              (match (str:parse-int head)
-                ((None) (parser-error (<> "Integer parse fail: " head)))
-                ((Some int) (pure (JSON-Integer int))))))
-          (float-parser
-            (fn (head fraction exponent)
-              (match (parse-float head fraction exponent)
-                ((None) (parser-error
-                         (foldr <> ""
-                                (make-list "Fraction parse fail: ("
-                                           head " " fraction " " exponent ")"))))
-                ((Some float)
-                 (pure (JSON-Float float))))))
-          (fraction-parser
+    (let integer-parser =
+      (fn (head)
+        (match (str:parse-int head)
+          ((None) (parser-error (<> "Integer parse fail: " head)))
+          ((Some int) (pure (JSON-Integer int))))))
+    (let float-parser =
+      (fn (head fraction exponent)
+        (match (parse-float head fraction exponent)
+          ((None) (parser-error
+                   (foldr <> ""
+                          (make-list "Fraction parse fail: ("
+                                     head " " fraction " " exponent ")"))))
+          ((Some float)
+           (pure (JSON-Float float))))))
+    (let head-parser =
+      (progn
+        (let sign-parser =
+          (fn (continue-parser)
+            (>>= (or-eof-error peek-char)
+                 (fn (c)
+                   (cond
+                     ((== c #\-)
+                      (>> (or-eof-error read-char)
+                          (liftA2 <> (pure "-") continue-parser)))
+                     (True continue-parser))))))
+        (sign-parser
+         (>>= (or-eof-error peek-char)
+              (fn (c)
+                (cond
+                  ((== c #\0)
+                   (>>= digits-parser
+                        (fn (digits)
+                          (if (== digits "0")
+                              (pure digits)
+                              (parser-error (<> "(number-parser) Unxepcted digits: "
+                                                digits))))))
+                  ((digit1-9? c) digits-parser)
+                  (True
+                   (parser-error (<> "(number-parser) Unexpected Char: "
+                                     (into (make-list c)))))))))))
+    (let ((fraction-parser
             (fn (head)
               (>> (or-eof-error read-char)
                   (>>= digits-parser
@@ -436,7 +435,7 @@
                            (True
                             (>>= digits-parser
                                  (float-parser head fraction))))))))))
-      (>>= number-head-parser
+      (>>= head-parser
            (fn (head)
              (>>= peek-char
                   (fn (opt)
