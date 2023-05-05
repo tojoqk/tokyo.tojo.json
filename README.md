@@ -76,3 +76,7 @@ JSON-PARSER-EXAMPLE> (eval "{\"left\": 10, \"op\": \"-\", \"right\": 32.0}")
 #.NONE
 JSON-PARSER-EXAMPLE> 
 ```
+
+## LICENSE
+
+This program is licensed under the MIT License. See the LICENSE file for details.
