@@ -15,6 +15,7 @@
 (cl:in-package #:tokyo.tojo.json-parser/parser)
 
 (coalton-toplevel
+  ;; JSON is LL(1) grammar, so it only requires lookahead of one character.
   (define-type Stream (%Stream (Optional Char) (iter:Iterator Char)))
 
   (declare peek (Stream -> Optional Char))
