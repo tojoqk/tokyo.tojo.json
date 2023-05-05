@@ -37,7 +37,7 @@ If you are using Quicklisp, you can load the system with the following.
   (declare get-number (JSON -> (Optional Double-Float)))
   (define (get-number x)
     (match x
-      ((JSON-Number (JSON-Integer n)) (as-optional (tryinto n)))
+      ((JSON-Number (JSON-Integer n)) (as-optional (tryInto n)))
       ((JSON-Number (JSON-Float n)) (Some n))
       (_ None)))
 

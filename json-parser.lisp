@@ -105,7 +105,7 @@
              (cl:error (e)
                (cl:declare (cl:ignore e))
                (coalton None))))
-         (fn:compose as-optional tryinto)))
+         (fn:compose as-optional tryInto)))
 
   (define (empty-string-error parser msg)
     (>>= parser
