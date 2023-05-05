@@ -478,18 +478,8 @@
   (define (parse-json str)
     (parse-json! (iter:into-iter str)))
 
-  (define-instance (Eq JSON-Number)
-    (define (== x y)
-      (match x
-        ((JSON-Integer i1)
-         (match y
-           ((JSON-Integer i2) (== i1 i2))
-           (_ False)))
-        ((JSON-Float f1)
-         (match y
-           ((JSON-Float f2) (== f1 f2))
-           (_ False))))))
-
+  ;; TODO: If the deriving mechanism is added to Coalton, use it.
+  ;; @see: https://github.com/coalton-lang/coalton/issues/10
   (define-instance (Eq JSON)
     (define (== x y)
       (match x
@@ -516,4 +506,16 @@
         ((JSON-Number n1)
          (match y
            ((JSON-Number n2) (== n1 n2))
+           (_ False))))))
+
+  (define-instance (Eq JSON-Number)
+    (define (== x y)
+      (match x
+        ((JSON-Integer i1)
+         (match y
+           ((JSON-Integer i2) (== i1 i2))
+           (_ False)))
+        ((JSON-Float f1)
+         (match y
+           ((JSON-Float f2) (== f1 f2))
            (_ False)))))))
