@@ -113,10 +113,7 @@
              (cl:error (e)
                (cl:declare (cl:ignore e))
                (coalton None))))
-         (fn (x)
-           (match (tryinto x)
-             ((Ok x) (Some x))
-             ((Err _) None)))))
+         (fn:compose as-optional tryinto)))
 
   (define (empty-string-error parser msg)
     (>>= parser
