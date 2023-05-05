@@ -348,18 +348,16 @@
 
   (declare parse-float (String -> String -> String -> (Optional Double-Float)))
   (define (parse-float head fraction exponent)
-    (let ((str (foldr <>
-                      ""
-                      (make-list head "." fraction "d" exponent))))
-      (lisp (Optional Double-Float) (str)
-        (cl:handler-case
-            (cl:let ((cl:*read-eval* cl:nil))
-              (cl:let ((value (cl:read-from-string str)))
-                (cl:check-type value cl:double-float)
-                (coalton (Some (lisp Double-Float () value)))))
-          (cl:error (e)
-            (cl:declare (cl:ignore e))
-            (coalton None))))))
+    (let str = (foldr <> "" (make-list head "." fraction "d" exponent)))
+    (lisp (Optional Double-Float) (str)
+      (cl:handler-case
+          (cl:let ((cl:*read-eval* cl:nil))
+            (cl:let ((value (cl:read-from-string str)))
+              (cl:check-type value cl:double-float)
+              (coalton (Some (lisp Double-Float () value)))))
+        (cl:error (e)
+          (cl:declare (cl:ignore e))
+          (coalton None)))))
 
   (declare number-head-parser (Parser String))
   (define number-head-parser
