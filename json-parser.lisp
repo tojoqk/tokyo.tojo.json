@@ -38,20 +38,12 @@
 
   (declare digit? (Char -> Boolean))
   (define (digit? c)
-    (or (== c #\0)
-        (digit1-9? c)))
+    (char:ascii-digit? c))
 
   (declare digit1-9? (Char -> Boolean))
   (define (digit1-9? c)
-    (or (== c #\1)
-        (== c #\2)
-        (== c #\3)
-        (== c #\4)
-        (== c #\5)
-        (== c #\6)
-        (== c #\7)
-        (== c #\8)
-        (== c #\9)))
+    (and (char:ascii-digit? c)
+         (not (== c #\0))))
 
   (define-type JSON-Value-Type
     (JString)
