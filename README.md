@@ -71,6 +71,8 @@ If you are using Quicklisp, you can load the system with the following.
 in REPL:
 
 ```lisp
+CL-USER> (in-package #:json-parser-example)
+#<COMMON-LISP:PACKAGE "JSON-PARSER-EXAMPLE">
 JSON-PARSER-EXAMPLE> (eval "{\"left\": 10, \"op\": \"+\", \"right\": 32.0}")
 #.(SOME 42.0d0)
 JSON-PARSER-EXAMPLE> (eval "{\"left\": 10, \"op\": \"-\", \"right\": 32.0}")
