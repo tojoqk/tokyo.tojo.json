@@ -63,8 +63,9 @@ If you are using Quicklisp, you can load the system with the following.
                   get-string))
       (right <- (>>= (map:lookup obj "right")
                      get-number))
-      (cond ((== op "+") (pure (+ left right)))
-            (True None)))))
+      (match op
+        ("+" (pure (+ left right)))
+        (_ (default))))))
 ```
 
 in REPL:
