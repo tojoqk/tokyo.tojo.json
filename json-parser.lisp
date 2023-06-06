@@ -105,7 +105,7 @@
              (cl:error (e)
                (cl:declare (cl:ignore e))
                (coalton None))))
-         (fn:compose as-optional tryInto)))
+         (.> tryInto as-optional)))
 
   (define (empty-string-error parser msg)
     (>>= parser
@@ -448,13 +448,13 @@
          (fn (type)
            (match type
              ((JNull) (>> (null-parser) (pure JSON-Null)))
-             ((JTrue) (>>= (true-parser) (fn:compose pure JSON-Boolean)))
-             ((JFalse) (>>= (false-parser) (fn:compose pure JSON-Boolean)))
-             ((JString) (>>= (string-parser) (fn:compose pure JSON-String)))
-             ((JArray) (>>= (array-parser) (fn:compose pure JSON-Array)))
-             ((JObject) (>>= (object-parser) (fn:compose pure JSON-Object)))
+             ((JTrue) (>>= (true-parser) (.> JSON-Boolean pure)))
+             ((JFalse) (>>= (false-parser) (.> JSON-Boolean pure)))
+             ((JString) (>>= (string-parser) (.> JSON-String pure)))
+             ((JArray) (>>= (array-parser) (.> JSON-Array pure)))
+             ((JObject) (>>= (object-parser) (.> JSON-Object pure)))
              ((JNumber) (>>= number-parser
-                             (fn:compose pure JSON-Number)))))))
+                             (.> JSON-Number pure)))))))
 
   (declare parse-json! (iter:Iterator Char -> (Result String JSON)))
   (define (parse-json! iter)
