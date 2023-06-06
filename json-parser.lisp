@@ -157,10 +157,8 @@
 
   (declare escape-char-map (map:Map Char String))
   (define escape-char-map
-    (foldr (fn (x acc)
-             (match x
-               ((Tuple k v)
-                (map:insert-or-replace acc k v))))
+    (foldr (fn ((Tuple k v) acc)
+             (map:insert-or-replace acc k v))
            map:empty
            (make-list
             (Tuple #\" "\"")

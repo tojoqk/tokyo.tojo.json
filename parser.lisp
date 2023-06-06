@@ -32,29 +32,25 @@
   (define-type (Parser :a) (Parser (Stream -> Result String (Tuple :a Stream))))
 
   (define-instance (Functor Parser)
-    (define (map f p)
+    (define (map f (Parser parse!))
       (Parser
        (fn (in)
-         (match p
-           ((Parser parse!)
-            (>>= (parse! in)
-                 (fn ((Tuple x in_))
-                   (pure (Tuple (f x) in_))))))))))
+         (>>= (parse! in)
+              (fn ((Tuple x in_))
+                (pure (Tuple (f x) in_))))))))
 
   (define-instance (Applicative Parser)
     (define (pure p)
       (Parser (fn (in) (Ok (Tuple p in)))))
 
-    (define (liftA2 op p1 p2)
+    (define (liftA2 op (Parser parse1!) (Parser parse2!))
       (Parser
        (fn (in)
-         (match (Tuple p1 p2)
-           ((Tuple (Parser parse1!) (Parser parse2!))
-            (>>= (parse1! in)
-                 (fn ((Tuple x in_))
-                   (>>= (parse2! in_)
-                        (fn ((Tuple y in__))
-                          (pure (Tuple (op x y) in__))))))))))))
+         (>>= (parse1! in)
+              (fn ((Tuple x in_))
+                (>>= (parse2! in_)
+                     (fn ((Tuple y in__))
+                       (pure (Tuple (op x y) in__))))))))))
 
   (define-instance (Monad Parser)
     (define (>>= (Parser parse!) f)
@@ -89,9 +85,7 @@
     (%Stream (iter:next! iter) iter))
 
   (declare run-parser! (Parser :a -> Stream -> Result String :a))
-  (define (run-parser! parser in)
-    (match parser
-      ((Parser parse!)
-       (>>= (parse! in)
-            (fn ((Tuple x _))
-              (pure x)))))))
+  (define (run-parser! (Parser parse!) in)
+    (>>= (parse! in)
+         (fn ((Tuple x _))
+           (pure x)))))
