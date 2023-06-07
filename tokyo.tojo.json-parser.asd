@@ -14,7 +14,6 @@
   :license  "BSD"
   :version "0.0.0"
   :depends-on (#:tokyo.tojo.json-parser
-               #:coalton
-               #:fiveam)
+               #:coalton/testing)
   :serial t
   :components ((:file "json-parser-tests")))
