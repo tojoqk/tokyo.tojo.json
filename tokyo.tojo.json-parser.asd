@@ -5,6 +5,7 @@
   :version "0.0.0"
   :depends-on (#:coalton)
   :serial t
+  :pathname "src/"
   :components ((:file "parser")
                (:file "json-parser")))
 
