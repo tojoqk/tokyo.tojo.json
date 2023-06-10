@@ -29,9 +29,9 @@
        (let c_ = (iter:next! iter))
        (Some (Tuple c (%Stream c_ iter))))))
 
-  (define-type (Parser :a) (Parser (Stream -> Result String (Tuple :a Stream))))
+  (define-type (Parser :e :a) (Parser (Stream -> Result :e (Tuple :a Stream))))
 
-  (define-instance (Functor Parser)
+  (define-instance (Functor (Parser :e))
     (define (map f (Parser parse!))
       (Parser
        (fn (in)
@@ -39,7 +39,7 @@
               (fn ((Tuple x in_))
                 (pure (Tuple (f x) in_))))))))
 
-  (define-instance (Applicative Parser)
+  (define-instance (Applicative (Parser :e))
     (define (pure p)
       (Parser (fn (in) (Ok (Tuple p in)))))
 
@@ -52,7 +52,7 @@
                      (fn ((Tuple y in__))
                        (pure (Tuple (op x y) in__))))))))))
 
-  (define-instance (Monad Parser)
+  (define-instance (Monad (Parser :e))
     (define (>>= (Parser parse!) f)
       (Parser
        (fn (in)
@@ -64,11 +64,11 @@
                         (fn ((Tuple x_ in__))
                           (pure (Tuple x_ in__))))))))))))
 
-  (declare peek-char (Parser (Optional Char)))
+  (declare peek-char (Parser :e (Optional Char)))
   (define peek-char
     (Parser (fn (in) (Ok (Tuple (peek in) in)))))
 
-  (declare read-char (Parser (Optional Char)))
+  (declare read-char (Parser :e (Optional Char)))
   (define read-char
     (Parser
      (fn (in)
@@ -76,7 +76,7 @@
          ((Some (Tuple c in_)) (Ok (Tuple (Some c) in_)))
          ((None) (Ok (Tuple None in)))))))
 
-  (declare parser-error (String -> Parser :a))
+  (declare parser-error (:e -> Parser :e :a))
   (define (parser-error msg)
     (Parser (fn (_) (Err msg))))
 
@@ -84,7 +84,7 @@
   (define (make-stream! iter)
     (%Stream (iter:next! iter) iter))
 
-  (declare run-parser! (Parser :a -> Stream -> Result String :a))
+  (declare run-parser! (Parser :e :a -> Stream -> Result :e :a))
   (define (run-parser! (Parser parse!) in)
     (>>= (parse! in)
          (fn ((Tuple x _))

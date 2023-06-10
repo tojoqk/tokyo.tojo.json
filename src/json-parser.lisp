@@ -54,7 +54,7 @@
     (JFalse)
     (JNull))
 
-  (declare or-eof-error (Parser (Optional :a) -> Parser :a))
+  (declare or-eof-error (Parser String (Optional :a) -> Parser String :a))
   (define (or-eof-error p)
     (>>= p
          (fn (opt)
@@ -62,7 +62,7 @@
              ((Some x) (pure x))
              ((None) (parser-error "Unexpected EOF"))))))
 
-  (declare json-type-parser (Unit -> Parser JSON-Value-Type))
+  (declare json-type-parser (Unit -> Parser String JSON-Value-Type))
   (define (json-type-parser)
     (>>= (or-eof-error peek-char)
          (fn (c)
@@ -114,7 +114,7 @@
                (pure str)
                (parser-error msg)))))
 
-  (declare take-until-parser ((Char -> Boolean) -> (Parser String)))
+  (declare take-until-parser ((Char -> Boolean) -> (Parser String String)))
   (define (take-until-parser end?)
     (let ((chars
             (fn ()
@@ -128,10 +128,10 @@
                             (liftA2 Cons (or-eof-error read-char) (chars))))))))))
       (map into (chars))))
 
-  (declare word-parser (Unit -> (Parser String)))
+  (declare word-parser (Unit -> (Parser String String)))
   (define (word-parser) (take-until-parser sep?))
 
-  (declare null-parser (Unit -> (Parser Unit)))
+  (declare null-parser (Unit -> (Parser String Unit)))
   (define (null-parser)
     (>>= (empty-string-error (word-parser) "(null-parser) Empty")
          (fn (word)
@@ -139,7 +139,7 @@
                (pure Unit)
                (parser-error (<> "(null-parser) Unexpected word: " word))))))
 
-  (declare true-parser (Unit -> (Parser Boolean)))
+  (declare true-parser (Unit -> (Parser String Boolean)))
   (define (true-parser)
     (>>= (empty-string-error (word-parser) "(true-parser) Empty")
          (fn (word)
@@ -147,7 +147,7 @@
                (pure True)
                (parser-error (<> "(true-parser) Unexpected word: " word))))))
 
-  (declare false-parser (Unit -> (Parser Boolean)))
+  (declare false-parser (Unit -> (Parser String Boolean)))
   (define (false-parser)
     (>>= (empty-string-error (word-parser) "(false-parser) Empty")
          (fn (word)
@@ -170,16 +170,16 @@
             (Tuple #\r (into (make-list #\return)))
             (Tuple #\t (into (make-list #\tab))))))
 
-  (declare take-parser (UFix -> (Parser string)))
+  (declare take-parser (UFix -> (Parser String string)))
   (define (take-parser n)
     (map into
          (foldr (liftA2 Cons)
                 (pure (make-list))
                 (list:repeat n (or-eof-error peek-char)))))
 
-  (declare string-parser (Unit -> Parser String))
+  (declare string-parser (Unit -> Parser String String))
   (define (string-parser)
-    (let ((declare start-parser (Unit -> (Parser (List String))))
+    (let ((declare start-parser (Unit -> (Parser String (List String))))
           (start-parser
             (fn ()
               (let ((escape-parser
@@ -222,7 +222,7 @@
            (fn (lst)
              (pure (mconcat lst))))))
 
-  (declare array-parser (Unit -> (Parser (List JSON))))
+  (declare array-parser (Unit -> (Parser String (List JSON))))
   (define (array-parser)
     (let ((start-parser
             (fn ()
@@ -247,7 +247,7 @@
                              (pure Nil))
                          (start-parser))))))))
 
-  (declare object-parser (Unit -> Parser (map:Map String JSON)))
+  (declare object-parser (Unit -> Parser String (map:Map String JSON)))
   (define (object-parser)
     (let key-parser = (string-parser))
     (let value-parser = (>> (whitespace-parser) (json-parser)))
@@ -314,7 +314,7 @@
         (== c #\,)
         (== c #\")))
 
-  (declare digits-parser (Parser String))
+  (declare digits-parser (Parser String String))
   (define digits-parser
     (let length>0-check =
       (fn (str)
@@ -349,7 +349,7 @@
           (cl:declare (cl:ignore e))
           (coalton None)))))
 
-  (declare number-parser (Parser JSON-Number))
+  (declare number-parser (Parser String JSON-Number))
   (define number-parser
     (let integer-parser =
       (fn (head)
@@ -441,7 +441,7 @@
                            (<> "Unexpected Char"
                                (into (make-list c))))))))))))))
 
-  (declare json-parser (Unit -> (Parser JSON)))
+  (declare json-parser (Unit -> (Parser String JSON)))
   (define (json-parser)
     (>>= (>> (whitespace-parser)
              (json-type-parser))
