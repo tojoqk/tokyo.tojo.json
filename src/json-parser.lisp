@@ -23,6 +23,8 @@
 
 (cl:in-package #:tokyo.tojo.json-parser/json-parser)
 
+(cl:declaim (cl:optimize (cl:speed 3)))
+
 (coalton-toplevel
   (define-type JSON-Number
     (JSON-Integer Integer)
@@ -116,17 +118,7 @@
 
   (declare take-until-parser ((Char -> Boolean) -> (Parser String String)))
   (define (take-until-parser end?)
-    (let ((chars
-            (fn ()
-              (>>= peek-char
-                   (fn (opt)
-                     (match opt
-                       ((None) (pure Nil))
-                       ((Some c)
-                        (if (end? c)
-                            (pure Nil)
-                            (liftA2 Cons (or-eof-error read-char) (chars))))))))))
-      (map into (chars))))
+    (take-until-string end?))
 
   (declare word-parser (Unit -> (Parser String String)))
   (define (word-parser) (take-until-parser sep?))

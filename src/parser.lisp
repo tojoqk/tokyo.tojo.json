@@ -8,6 +8,7 @@
            #:Stream
            #:peek-char
            #:read-char
+           #:take-until-string
            #:parser-error
            #:make-stream!
            #:run-parser!))
@@ -75,6 +76,32 @@
        (match (read! in)
          ((Some (Tuple c in_)) (Ok (Tuple (Some c) in_)))
          ((None) (Ok (Tuple None in)))))))
+
+  (declare take-until-string ((Char -> Boolean) -> Parser :e String))
+  (define (take-until-string end?)
+    (Parser
+     (fn (in)
+       (Ok
+        (lisp (Tuple String Stream) (end? in)
+          (cl:let ((in* in)
+                   (out (cl:make-string-output-stream)))
+            (cl:loop
+               :while (coalton
+                       (match (peek (lisp Stream () in*))
+                         ((Some x)
+                          (not ((lisp (Char -> Boolean) () end?) x)))
+                         ((None) False)))
+               :do (coalton
+                    (match (read! (lisp Stream () in*))
+                      ((Some (Tuple x in_))
+                       (lisp Unit (x in_)
+                         (cl:setf in* in_)
+                         (cl:write-char x out)
+                         Unit))
+                      (_ Unit))))
+            (coalton
+             (Tuple (lisp String () (cl:get-output-stream-string out))
+                    (lisp Stream () in*)))))))))
 
   (declare parser-error (:e -> Parser :e :a))
   (define (parser-error msg)
