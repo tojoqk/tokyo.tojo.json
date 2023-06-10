@@ -23,8 +23,6 @@
 
 (cl:in-package #:tokyo.tojo.json-parser/json-parser)
 
-(cl:declaim (cl:optimize (cl:speed 3)))
-
 (coalton-toplevel
   (define-type JSON-Number
     (JSON-Integer Integer)
