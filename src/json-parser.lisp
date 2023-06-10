@@ -220,7 +220,7 @@
       (>>= (>> (or-eof-error read-char)
                (start-parser))
            (fn (lst)
-             (pure (foldr <> "" lst))))))
+             (pure (mconcat lst))))))
 
   (declare array-parser (Unit -> (Parser (List JSON))))
   (define (array-parser)
@@ -338,7 +338,7 @@
 
   (declare parse-float (String -> String -> String -> (Optional Double-Float)))
   (define (parse-float head fraction exponent)
-    (let str = (foldr <> "" (make-list head "." fraction "d" exponent)))
+    (let str = (mconcat (make-list head "." fraction "d" exponent)))
     (lisp (Optional Double-Float) (str)
       (cl:handler-case
           (cl:let ((cl:*read-eval* cl:nil))
@@ -359,10 +359,10 @@
     (let float-parser =
       (fn (head fraction exponent)
         (match (parse-float head fraction exponent)
-          ((None) (parser-error
-                   (foldr <> ""
-                          (make-list "Fraction parse fail: ("
-                                     head " " fraction " " exponent ")"))))
+          ((None)
+           (parser-error
+            (mconcat
+             (make-list "Fraction parse fail: (" head " " fraction " " exponent ")"))))
           ((Some float)
            (pure (JSON-Float float))))))
     (let head-parser =
