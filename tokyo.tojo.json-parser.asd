@@ -1,7 +1,7 @@
 (asdf:defsystem #:tokyo.tojo.json-parser
   :description "JSON parser"
   :author "Masaya Tojo"
-  :license  "BSD"
+  :license  "MIT"
   :version "0.0.0"
   :depends-on (#:coalton)
   :serial t
@@ -12,7 +12,7 @@
 (asdf:defsystem #:tokyo.tojo.json-parser/test
   :description "Tests of JSON parser"
   :author "Masaya Tojo"
-  :license  "BSD"
+  :license  "MIT"
   :version "0.0.0"
   :depends-on (#:tokyo.tojo.json-parser
                #:coalton/testing)
