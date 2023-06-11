@@ -54,15 +54,36 @@
     (JFalse)
     (JNull))
 
-  (declare or-eof-error (Parser String (Optional :a) -> Parser String :a))
+  (define-type ErrorType
+    (UnexpectedEof)
+    (UnexpectedChar Char)
+    (UnexpectedString String))
+
+  (define-instance (Eq ErrorType)
+    (define (== x y)
+      (match x
+        ((UnexpectedEof)
+         (match y
+           ((UnexpectedEof) True)
+           (_ False)))
+        ((UnexpectedChar cx)
+         (match y
+           ((UnexpectedChar cy) (== cx cy))
+           (_ False)))
+        ((UnexpectedString cx)
+         (match y
+           ((UnexpectedString cy) (== cx cy))
+           (_ False))))))
+
+  (declare or-eof-error (Parser ErrorType (Optional :a) -> Parser ErrorType :a))
   (define (or-eof-error p)
     (>>= p
          (fn (opt)
            (match opt
              ((Some x) (pure x))
-             ((None) (parser-error "Unexpected EOF"))))))
+             ((None) (parser-error UnexpectedEof))))))
 
-  (declare json-type-parser (Unit -> Parser String JSON-Value-Type))
+  (declare json-type-parser (Unit -> Parser ErrorType JSON-Value-Type))
   (define (json-type-parser)
     (>>= (or-eof-error peek-char)
          (fn (c)
@@ -75,8 +96,7 @@
              ((== c #\f) (pure JFalse))
              ((== c #\n) (pure JNull))
              ((== c #\{) (pure JObject))
-             (True (parser-error (<> "(json-parser) Unexpected Char: "
-                                     (into (make-list c)))))))))
+             (True (parser-error (UnexpectedChar c)))))))
 
   (define (whitespace? c)
     (or (== c #\return)
@@ -114,36 +134,36 @@
                (pure str)
                (parser-error msg)))))
 
-  (declare take-until-parser ((Char -> Boolean) -> (Parser String String)))
+  (declare take-until-parser ((Char -> Boolean) -> (Parser :e String)))
   (define (take-until-parser end?)
     (take-until-string end?))
 
-  (declare word-parser (Unit -> (Parser String String)))
+  (declare word-parser (Unit -> (Parser :e String)))
   (define (word-parser) (take-until-parser sep?))
 
-  (declare null-parser (Unit -> (Parser String Unit)))
+  (declare null-parser (Unit -> (Parser ErrorType Unit)))
   (define (null-parser)
-    (>>= (empty-string-error (word-parser) "(null-parser) Empty")
+    (>>= (empty-string-error (word-parser) (UnexpectedString ""))
          (fn (word)
            (if (== word "null")
                (pure Unit)
-               (parser-error (<> "(null-parser) Unexpected word: " word))))))
+               (parser-error (UnexpectedString word))))))
 
-  (declare true-parser (Unit -> (Parser String Boolean)))
+  (declare true-parser (Unit -> (Parser ErrorType Boolean)))
   (define (true-parser)
-    (>>= (empty-string-error (word-parser) "(true-parser) Empty")
+    (>>= (empty-string-error (word-parser) (UnexpectedString ""))
          (fn (word)
            (if (== word "true")
                (pure True)
-               (parser-error (<> "(true-parser) Unexpected word: " word))))))
+               (parser-error (UnexpectedString word))))))
 
-  (declare false-parser (Unit -> (Parser String Boolean)))
+  (declare false-parser (Unit -> (Parser ErrorType Boolean)))
   (define (false-parser)
-    (>>= (empty-string-error (word-parser) "(false-parser) Empty")
+    (>>= (empty-string-error (word-parser) (UnexpectedString ""))
          (fn (word)
            (if (== word "false")
                (pure False)
-               (parser-error (<> "(false-parser) Unexpected word: " word))))))
+               (parser-error (UnexpectedString word))))))
 
   (declare escape-char-map (map:Map Char String))
   (define escape-char-map
@@ -160,16 +180,16 @@
             (Tuple #\r (into (make-list #\return)))
             (Tuple #\t (into (make-list #\tab))))))
 
-  (declare take-parser (UFix -> (Parser String string)))
+  (declare take-parser (UFix -> (Parser ErrorType string)))
   (define (take-parser n)
     (map into
          (foldr (liftA2 Cons)
                 (pure (make-list))
                 (list:repeat n (or-eof-error peek-char)))))
 
-  (declare string-parser (Unit -> Parser String String))
+  (declare string-parser (Unit -> Parser ErrorType String))
   (define (string-parser)
-    (let ((declare start-parser (Unit -> (Parser String (List String))))
+    (let ((declare start-parser (Unit -> (Parser ErrorType (List String))))
           (start-parser
             (fn ()
               (let ((escape-parser
@@ -183,13 +203,12 @@
                                          (fn (str)
                                            (match (>>= (parse-hex str) char:code-char)
                                              ((None)
-                                              (parser-error (<> "Invalid code: " str)))
+                                              (parser-error (UnexpectedString str)))
                                              ((Some c)
                                               (liftA2 Cons
                                                       (pure (into (make-list c)))
                                                       (start-parser))))))
-                                    (parser-error (<> "Unexpected escape char: "
-                                                      (into (make-list c))))))))))
+                                    (parser-error (UnexpectedChar c))))))))
                     (str-parser
                       (take-until-parser
                        (fn (c)
@@ -212,7 +231,7 @@
            (fn (lst)
              (pure (mconcat lst))))))
 
-  (declare array-parser (Unit -> (Parser String (List JSON))))
+  (declare array-parser (Unit -> (Parser ErrorType (List JSON))))
   (define (array-parser)
     (let ((start-parser
             (fn ()
@@ -224,9 +243,7 @@
                                (cond
                                  ((== c #\]) (pure (make-list value)))
                                  ((== c #\,) (liftA2 Cons (pure value) (start-parser)))
-                                 (True (parser-error
-                                        (<> "(array-parser) Unexpected char: "
-                                            (into (make-list c)))))))))))
+                                 (True (parser-error (UnexpectedChar c)))))))))
                 (>>= (json-parser) continue-parser)))))
       (>> (or-eof-error read-char)
           (>> (whitespace-parser)
@@ -237,7 +254,7 @@
                              (pure Nil))
                          (start-parser))))))))
 
-  (declare object-parser (Unit -> Parser String (map:Map String JSON)))
+  (declare object-parser (Unit -> Parser ErrorType (map:Map String JSON)))
   (define (object-parser)
     (let key-parser = (string-parser))
     (let value-parser = (>> (whitespace-parser) (json-parser)))
@@ -251,10 +268,7 @@
                         (>>= value-parser
                              (fn (value)
                                (pure (Tuple key value))))
-                        (parser-error
-                         (<> "(object-parser) Unexpected Char: "
-                             (<> (into (make-list c))
-                                 " (Expected: ':')")))))))))
+                        (parser-error (UnexpectedChar c))))))))
     (let ((start-parser
             (fn ()
               (let ((continue-parser
@@ -270,10 +284,7 @@
                                  (#\}
                                   (pure (map:insert-or-replace map:empty key value)))
                                  (_
-                                  (parser-error
-                                   (<> "(object-parser) Unexpected Char: "
-                                       (<> (into (make-list c))
-                                           " (Expected: ',' or '}')"))))))))))
+                                  (parser-error (UnexpectedChar c)))))))))
                 (>>= (>> (whitespace-parser)
                          (or-eof-error peek-char))
                      (fn (c)
@@ -281,10 +292,7 @@
                          (#\"
                           (>>= key-value-parser continue-parser))
                          (_
-                          (parser-error
-                           (<> "(object-parser) Unexpected Char: "
-                               (<> (into (make-list c))
-                                   " (Expected: '\"')")))))))))))
+                          (parser-error (UnexpectedChar c))))))))))
       (>>= (>> (or-eof-error read-char)
                (>> (whitespace-parser)
                    (or-eof-error peek-char)))
@@ -304,13 +312,13 @@
         (== c #\,)
         (== c #\")))
 
-  (declare digits-parser (Parser String String))
+  (declare digits-parser (Parser ErrorType String))
   (define digits-parser
     (let length>0-check =
       (fn (str)
         (if (< 0 (str:length str))
             (pure str)
-            (parser-error "Empty digits"))))
+            (parser-error (UnexpectedString "")))))
     (>>= (take-until-parser (fn:complement digit?))
          (fn (str)
            (>>= peek-char
@@ -323,8 +331,7 @@
                              (== c #\e)
                              (== c #\E))
                          (length>0-check str)
-                         (parser-error (<> "Unexpected Char:"
-                                           (into (make-list c))))))))))))
+                         (parser-error (UnexpectedChar c))))))))))
 
   (declare parse-float (String -> String -> String -> (Optional Double-Float)))
   (define (parse-float head fraction exponent)
@@ -339,20 +346,19 @@
           (cl:declare (cl:ignore e))
           (coalton None)))))
 
-  (declare number-parser (Parser String JSON-Number))
+  (declare number-parser (Parser ErrorType JSON-Number))
   (define number-parser
     (let integer-parser =
       (fn (head)
         (match (str:parse-int head)
-          ((None) (parser-error (<> "Integer parse fail: " head)))
+          ((None) (parser-error (UnexpectedString head)))
           ((Some int) (pure (JSON-Integer int))))))
     (let float-parser =
       (fn (head fraction exponent)
         (match (parse-float head fraction exponent)
           ((None)
-           (parser-error
-            (mconcat
-             (make-list "Fraction parse fail: (" head " " fraction " " exponent ")"))))
+           (parser-error (UnexpectedString (mconcat
+                                            (make-list head "." fraction "e" exponent)))))
           ((Some float)
            (pure (JSON-Float float))))))
     (let head-parser =
@@ -375,12 +381,10 @@
                         (fn (digits)
                           (if (== digits "0")
                               (pure digits)
-                              (parser-error (<> "(number-parser) Unxepcted digits: "
-                                                digits))))))
+                              (parser-error (UnexpectedString digits))))))
                   ((digit1-9? c) digits-parser)
                   (True
-                   (parser-error (<> "(number-parser) Unexpected Char: "
-                                     (into (make-list c)))))))))))
+                   (parser-error (UnexpectedChar c)))))))))
     (let ((fraction-parser
             (fn (head)
               (>> (or-eof-error read-char)
@@ -396,9 +400,7 @@
                                       (exponent-parser head fraction))
                                      ((sep? c) (float-parser head fraction "0"))
                                      (True
-                                      (parser-error
-                                       (<> "Unexpected Char"
-                                           (into (make-list c)))))))))))))))
+                                      (parser-error (UnexpectedChar c)))))))))))))
           (exponent-parser
             (fn (head fraction)
               (>> (or-eof-error read-char)
@@ -427,11 +429,9 @@
                          ((or (== c #\e) (== c #\E)) (exponent-parser head "0"))
                          ((sep? c) (integer-parser head))
                          (True
-                          (parser-error
-                           (<> "Unexpected Char"
-                               (into (make-list c))))))))))))))
+                          (parser-error (UnexpectedChar c))))))))))))
 
-  (declare json-parser (Unit -> (Parser String JSON)))
+  (declare json-parser (Unit -> (Parser ErrorType JSON)))
   (define (json-parser)
     (>>= (>> (whitespace-parser)
              (json-type-parser))
@@ -446,12 +446,12 @@
              ((JNumber) (>>= number-parser
                              (.> JSON-Number pure)))))))
 
-  (declare parse-json! (iter:Iterator Char -> (Result String JSON)))
+  (declare parse-json! (iter:Iterator Char -> (Result ErrorType JSON)))
   (define (parse-json! iter)
     (run-parser! (json-parser)
                  (make-stream! iter)))
 
-  (declare parse-json (String -> (Result String JSON)))
+  (declare parse-json (String -> (Result ErrorType JSON)))
   (define (parse-json str)
     (parse-json! (iter:into-iter str)))
 
