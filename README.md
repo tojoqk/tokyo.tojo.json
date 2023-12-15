@@ -32,6 +32,8 @@ If you are using Quicklisp, you can load the system with the following.
 
 (in-package #:json-parser-example)
 
+(named-readtables:in-readtable coalton:coalton)
+
 (coalton-toplevel
   (declare get-number (parser:JSON -> (Optional Double-Float)))
   (define (get-number x)
