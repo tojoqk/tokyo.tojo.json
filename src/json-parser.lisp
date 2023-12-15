@@ -1,7 +1,6 @@
 (cl:defpackage #:tokyo.tojo.json-parser/json-parser
   (:use #:coalton
-        #:coalton-library/builtin
-        #:coalton-library/classes
+        #:coalton-prelude
         #:tokyo.tojo.json-parser/parser)
   (:nicknames #:tokyo.tojo.json-parser)
   (:local-nicknames
