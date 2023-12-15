@@ -17,8 +17,8 @@
            #:JSON-Boolean
            #:JSON-Array
            #:JSON-Object
-           #:parse-json
-           #:parse-json!))
+           #:parse
+           #:parse!))
 
 (cl:in-package #:tokyo.tojo.json-parser/json-parser)
 
@@ -447,14 +447,14 @@
              ((JNumber) (>>= number-parser
                              (.> JSON-Number pure)))))))
 
-  (declare parse-json! (iter:Iterator Char -> (Result ErrorType JSON)))
-  (define (parse-json! iter)
+  (declare parse! (iter:Iterator Char -> (Result ErrorType JSON)))
+  (define (parse! iter)
     (parser:run! (json-parser)
                  (parser:make-stream! iter)))
 
-  (declare parse-json (String -> (Result ErrorType JSON)))
-  (define (parse-json str)
-    (parse-json! (iter:into-iter str)))
+  (declare parse (String -> (Result ErrorType JSON)))
+  (define (parse str)
+    (parse! (iter:into-iter str)))
 
   ;; TODO: If the deriving mechanism is added to Coalton, use it.
   ;; @see: https://github.com/coalton-lang/coalton/issues/10
