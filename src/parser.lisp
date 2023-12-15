@@ -3,7 +3,8 @@
         #:coalton-prelude)
   (:shadow #:error)
   (:local-nicknames
-   (#:iter #:coalton-library/iterator))
+   (#:iter #:coalton-library/iterator)
+   (#:cell #:Coalton-library/cell))
   (:export #:Parser
            #:Stream
            #:peek-char
@@ -79,31 +80,43 @@
          ((Some (Tuple c in_)) (Ok (Tuple (Some c) in_)))
          ((None) (Ok (Tuple None in)))))))
 
+  (repr :native cl:stream)
+  (define-type Lisp-Stream)
+
+  (declare lisp-write-char! (Char -> Lisp-Stream -> Unit))
+  (define (lisp-write-char! c s)
+    (lisp Unit (c s)
+      (cl:write-char c s)
+      Unit))
+
+  (declare lisp-make-string-output-sream (Unit -> Lisp-Stream))
+  (define (lisp-make-string-output-sream)
+    (lisp Lisp-Stream ()
+      (cl:make-string-output-stream)))
+
+  (declare lisp-get-output-stream-string (Lisp-Stream -> String))
+  (define (lisp-get-output-stream-string s)
+    (lisp String (s)
+      (cl:get-output-stream-string s)))
+
   (declare take-until-string ((Char -> Boolean) -> Parser :e String))
   (define (take-until-string end?)
     (Parser
      (fn (in)
-       (Ok
-        (lisp (Tuple String Stream) (end? in)
-          (cl:let ((in* in)
-                   (out (cl:make-string-output-stream)))
-            (cl:loop
-               :while (coalton
-                       (match (peek (lisp Stream () in*))
-                         ((Some x)
-                          (not ((lisp (Char -> Boolean) () end?) x)))
-                         ((None) False)))
-               :do (coalton
-                    (match (read! (lisp Stream () in*))
-                      ((Some (Tuple x in_))
-                       (lisp Unit (x in_)
-                         (cl:setf in* in_)
-                         (cl:write-char x out)
-                         Unit))
-                      (_ Unit))))
-            (coalton
-             (Tuple (lisp String () (cl:get-output-stream-string out))
-                    (lisp Stream () in*)))))))))
+       (let ((out (lisp-make-string-output-sream))
+             (in* (cell:new in)))
+         (while (match (peek (cell:read in*))
+                  ((Some x) (not (end? x)))
+                  ((None) False))
+           (match (read! (cell:read in*))
+             ((Some (Tuple x in_))
+              (progn
+                (cell:swap! in* in_)
+                (lisp-write-char! x out)))
+             (_ Unit)))
+         (Ok
+          (Tuple (lisp-get-output-stream-string out)
+                 (cell:read in*)))))))
 
   (declare error (:e -> Parser :e :a))
   (define (error msg)
