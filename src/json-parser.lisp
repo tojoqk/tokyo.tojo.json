@@ -1,4 +1,4 @@
-(cl:defpackage #:tokyo.tojo.json-parser/json-parser
+(defpackage #:tokyo.tojo.json-parser/json-parser
   (:use #:coalton
         #:coalton-prelude)
   (:nicknames #:tokyo.tojo.json-parser)
@@ -20,7 +20,7 @@
            #:parse
            #:parse!))
 
-(cl:in-package #:tokyo.tojo.json-parser/json-parser)
+(in-package #:tokyo.tojo.json-parser/json-parser)
 
 (named-readtables:in-readtable coalton:coalton)
 

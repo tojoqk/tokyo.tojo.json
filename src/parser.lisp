@@ -1,4 +1,4 @@
-(cl:defpackage #:tokyo.tojo.json-parser/parser
+(defpackage #:tokyo.tojo.json-parser/parser
   (:use #:coalton
         #:coalton-prelude)
   (:shadow #:error)
@@ -14,7 +14,7 @@
            #:make-stream!
            #:run!))
 
-(cl:in-package #:tokyo.tojo.json-parser/parser)
+(in-package #:tokyo.tojo.json-parser/parser)
 
 (named-readtables:in-readtable coalton:coalton)
 

@@ -1,4 +1,4 @@
-(asdf:defsystem #:tokyo.tojo.json-parser
+(defsystem #:tokyo.tojo.json-parser
   :description "JSON parser"
   :author "Masaya Tojo"
   :license  "MIT"
@@ -10,7 +10,7 @@
                (:file "json-parser"))
   :in-order-to ((test-op (test-op "tokyo.tojo.json-parser/test"))))
 
-(asdf:defsystem #:tokyo.tojo.json-parser/test
+(defsystem #:tokyo.tojo.json-parser/test
   :description "Tests of JSON parser"
   :author "Masaya Tojo"
   :license  "MIT"
