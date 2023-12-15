@@ -174,7 +174,7 @@
             (Tuple #\\ "\\")
             (Tuple #\/ "/")
             (Tuple #\b (into (make-list #\backspace)))
-            (Tuple #\f (into (make-list #\formfeed)))
+            (Tuple #\f (into (make-list #\page)))
             (Tuple #\n (into (make-list #\newline)))
             (Tuple #\r (into (make-list #\return)))
             (Tuple #\t (into (make-list #\tab))))))
