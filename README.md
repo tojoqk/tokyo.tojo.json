@@ -25,47 +25,46 @@ If you are using Quicklisp, you can load the system with the following.
 ```lisp
 (defpackage #:json-parser-example
   (:use #:coalton
-        #:coalton-library/builtin
-        #:coalton-library/classes
-        #:tokyo.tojo.json-parser)
+        #:coalton-prelude)
   (:local-nicknames
+   (#:parser #:tokyo.tojo.json-parser)
    (#:map #:coalton-library/ord-map)))
 
 (in-package #:json-parser-example)
 
 (coalton-toplevel
-  (declare get-number (JSON -> (Optional Double-Float)))
+  (declare get-number (parser:JSON -> (Optional Double-Float)))
   (define (get-number x)
     (match x
-      ((JSON-Number (JSON-Integer n)) (as-optional (tryInto n)))
-      ((JSON-Number (JSON-Float n)) (Some n))
+      ((parser:JSON-Number (parser:JSON-Integer n)) (as-optional (tryInto n)))
+      ((parser:JSON-Number (parser:JSON-Float n)) (Some n))
       (_ None)))
 
-  (declare get-string (JSON -> (Optional String)))
+  (declare get-string (parser:JSON -> (Optional String)))
   (define (get-string x)
     (match x
-      ((JSON-String str) (Some str))
+      ((parser:JSON-String str) (Some str))
       (_ None)))
 
-  (declare get-object (JSON -> (Optional (map:Map String JSON))))
+  (declare get-object (parser:JSON -> (Optional (map:Map String parser:JSON))))
   (define (get-object x)
     (match x
-      ((JSON-Object m) (Some m))
+      ((parser:JSON-Object m) (Some m))
       (_ None)))
 
   (declare eval (String -> (Optional Double-Float)))
   (define (eval str)
-    (do (json <- (as-optional (parse-json str)))
+    (do (json <- (as-optional (parser:parse str)))
         (obj <- (get-object json))
-      (left <- (>>= (map:lookup obj "left")
-                    get-number))
-      (op <- (>>= (map:lookup obj "op")
-                  get-string))
-      (right <- (>>= (map:lookup obj "right")
-                     get-number))
-      (match op
-        ("+" (pure (+ left right)))
-        (_ (default))))))
+        (left <- (>>= (map:lookup obj "left")
+                      get-number))
+        (op <- (>>= (map:lookup obj "op")
+                    get-string))
+        (right <- (>>= (map:lookup obj "right")
+                       get-number))
+        (match op
+          ("+" (pure (+ left right)))
+          (_ (default))))))
 ```
 
 in REPL:
