@@ -82,7 +82,7 @@
          (fn (opt)
            (match opt
              ((Some x) (pure x))
-             ((None) (parser:parser-error UnexpectedEof))))))
+             ((None) (parser:error UnexpectedEof))))))
 
   (declare json-type-parser (Unit -> parser:Parser ErrorType JSON-Value-Type))
   (define (json-type-parser)
@@ -97,7 +97,7 @@
              ((== c #\f) (pure JFalse))
              ((== c #\n) (pure JNull))
              ((== c #\{) (pure JObject))
-             (True (parser:parser-error (UnexpectedChar c)))))))
+             (True (parser:error (UnexpectedChar c)))))))
 
   (define (whitespace? c)
     (or (== c #\return)
@@ -133,7 +133,7 @@
          (fn (str)
            (if (< 0 (str:length str))
                (pure str)
-               (parser:parser-error msg)))))
+               (parser:error msg)))))
 
   (declare take-until-parser ((Char -> Boolean) -> (parser:Parser :e String)))
   (define (take-until-parser end?)
@@ -148,7 +148,7 @@
          (fn (word)
            (if (== word "null")
                (pure Unit)
-               (parser:parser-error (UnexpectedString word))))))
+               (parser:error (UnexpectedString word))))))
 
   (declare true-parser (Unit -> (parser:Parser ErrorType Boolean)))
   (define (true-parser)
@@ -156,7 +156,7 @@
          (fn (word)
            (if (== word "true")
                (pure True)
-               (parser:parser-error (UnexpectedString word))))))
+               (parser:error (UnexpectedString word))))))
 
   (declare false-parser (Unit -> (parser:Parser ErrorType Boolean)))
   (define (false-parser)
@@ -164,7 +164,7 @@
          (fn (word)
            (if (== word "false")
                (pure False)
-               (parser:parser-error (UnexpectedString word))))))
+               (parser:error (UnexpectedString word))))))
 
   (declare escape-char-map (map:Map Char String))
   (define escape-char-map
@@ -204,12 +204,12 @@
                                          (fn (str)
                                            (match (>>= (parse-hex str) char:code-char)
                                              ((None)
-                                              (parser:parser-error (UnexpectedString str)))
+                                              (parser:error (UnexpectedString str)))
                                              ((Some c)
                                               (liftA2 Cons
                                                       (pure (into (make-list c)))
                                                       (start-parser))))))
-                                    (parser:parser-error (UnexpectedChar c))))))))
+                                    (parser:error (UnexpectedChar c))))))))
                     (str-parser
                       (take-until-parser
                        (fn (c)
@@ -244,7 +244,7 @@
                                (cond
                                  ((== c #\]) (pure (make-list value)))
                                  ((== c #\,) (liftA2 Cons (pure value) (start-parser)))
-                                 (True (parser:parser-error (UnexpectedChar c)))))))))
+                                 (True (parser:error (UnexpectedChar c)))))))))
                 (>>= (json-parser) continue-parser)))))
       (>> (or-eof-error parser:read-char)
           (>> (whitespace-parser)
@@ -269,7 +269,7 @@
                         (>>= value-parser
                              (fn (value)
                                (pure (Tuple key value))))
-                        (parser:parser-error (UnexpectedChar c))))))))
+                        (parser:error (UnexpectedChar c))))))))
     (let ((start-parser
             (fn ()
               (let ((continue-parser
@@ -285,7 +285,7 @@
                                  (#\}
                                   (pure (map:insert-or-replace map:empty key value)))
                                  (_
-                                  (parser:parser-error (UnexpectedChar c)))))))))
+                                  (parser:error (UnexpectedChar c)))))))))
                 (>>= (>> (whitespace-parser)
                          (or-eof-error parser:peek-char))
                      (fn (c)
@@ -293,7 +293,7 @@
                          (#\"
                           (>>= key-value-parser continue-parser))
                          (_
-                          (parser:parser-error (UnexpectedChar c))))))))))
+                          (parser:error (UnexpectedChar c))))))))))
       (>>= (>> (or-eof-error parser:read-char)
                (>> (whitespace-parser)
                    (or-eof-error parser:peek-char)))
@@ -319,7 +319,7 @@
       (fn (str)
         (if (< 0 (str:length str))
             (pure str)
-            (parser:parser-error (UnexpectedString "")))))
+            (parser:error (UnexpectedString "")))))
     (>>= (take-until-parser (fn:complement digit?))
          (fn (str)
            (>>= parser:peek-char
@@ -332,7 +332,7 @@
                              (== c #\e)
                              (== c #\E))
                          (length>0-check str)
-                         (parser:parser-error (UnexpectedChar c))))))))))
+                         (parser:error (UnexpectedChar c))))))))))
 
   (declare parse-float (String -> String -> String -> (Optional Double-Float)))
   (define (parse-float head fraction exponent)
@@ -352,13 +352,13 @@
     (let integer-parser =
       (fn (head)
         (match (str:parse-int head)
-          ((None) (parser:parser-error (UnexpectedString head)))
+          ((None) (parser:error (UnexpectedString head)))
           ((Some int) (pure (JSON-Integer int))))))
     (let float-parser =
       (fn (head fraction exponent)
         (match (parse-float head fraction exponent)
           ((None)
-           (parser:parser-error (UnexpectedString (mconcat
+           (parser:error (UnexpectedString (mconcat
                                                    (make-list head "." fraction "e" exponent)))))
           ((Some float)
            (pure (JSON-Float float))))))
@@ -382,10 +382,10 @@
                         (fn (digits)
                           (if (== digits "0")
                               (pure digits)
-                              (parser:parser-error (UnexpectedString digits))))))
+                              (parser:error (UnexpectedString digits))))))
                   ((digit1-9? c) digits-parser)
                   (True
-                   (parser:parser-error (UnexpectedChar c)))))))))
+                   (parser:error (UnexpectedChar c)))))))))
     (let ((fraction-parser
             (fn (head)
               (>> (or-eof-error parser:read-char)
@@ -401,7 +401,7 @@
                                       (exponent-parser head fraction))
                                      ((sep? c) (float-parser head fraction "0"))
                                      (True
-                                      (parser:parser-error (UnexpectedChar c)))))))))))))
+                                      (parser:error (UnexpectedChar c)))))))))))))
           (exponent-parser
             (fn (head fraction)
               (>> (or-eof-error parser:read-char)
@@ -430,7 +430,7 @@
                          ((or (== c #\e) (== c #\E)) (exponent-parser head "0"))
                          ((sep? c) (integer-parser head))
                          (True
-                          (parser:parser-error (UnexpectedChar c))))))))))))
+                          (parser:error (UnexpectedChar c))))))))))))
 
   (declare json-parser (Unit -> (parser:Parser ErrorType JSON)))
   (define (json-parser)
@@ -449,8 +449,8 @@
 
   (declare parse-json! (iter:Iterator Char -> (Result ErrorType JSON)))
   (define (parse-json! iter)
-    (parser:run-parser! (json-parser)
-                        (parser:make-stream! iter)))
+    (parser:run! (json-parser)
+                 (parser:make-stream! iter)))
 
   (declare parse-json (String -> (Result ErrorType JSON)))
   (define (parse-json str)

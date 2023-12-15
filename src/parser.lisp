@@ -1,6 +1,7 @@
 (cl:defpackage #:tokyo.tojo.json-parser/parser
   (:use #:coalton
         #:coalton-prelude)
+  (:shadow #:error)
   (:local-nicknames
    (#:iter #:coalton-library/iterator))
   (:export #:Parser
@@ -8,9 +9,9 @@
            #:peek-char
            #:read-char
            #:take-until-string
-           #:parser-error
+           #:error
            #:make-stream!
-           #:run-parser!))
+           #:run!))
 
 (cl:in-package #:tokyo.tojo.json-parser/parser)
 
@@ -104,16 +105,16 @@
              (Tuple (lisp String () (cl:get-output-stream-string out))
                     (lisp Stream () in*)))))))))
 
-  (declare parser-error (:e -> Parser :e :a))
-  (define (parser-error msg)
+  (declare error (:e -> Parser :e :a))
+  (define (error msg)
     (Parser (fn (_) (Err msg))))
 
   (declare make-stream! (iter:Iterator Char -> Stream))
   (define (make-stream! iter)
     (%Stream (iter:next! iter) iter))
 
-  (declare run-parser! (Parser :e :a -> Stream -> Result :e :a))
-  (define (run-parser! (Parser parse!) in)
+  (declare run! (Parser :e :a -> Stream -> Result :e :a))
+  (define (run! (Parser parse!) in)
     (>>= (parse! in)
          (fn ((Tuple x _))
            (pure x)))))
