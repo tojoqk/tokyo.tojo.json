@@ -1,69 +1,60 @@
-(fiasco:define-test-package #:tokyo.tojo.json-parser-test-fiasco)
-
-(defpackage #:tokyo.tojo.json-parser-test
+(defpackage #:tokyo.tojo.json-parser/test
   (:use #:coalton-testing
         #:tokyo.tojo.json-parser/json-parser)
   (:local-nicknames
-   (#:map #:coalton-library/ord-map)
-   (#:result #:coalton-library/result)))
+   (#:map #:coalton-library/ord-map))
+  (:export #:run-tests))
 
-(in-package #:tokyo.tojo.json-parser-test)
+(in-package #:tokyo.tojo.json-parser/test)
 
 (named-readtables:in-readtable coalton:coalton)
 
-(coalton-fiasco-init #:tokyo.tojo.json-parser-test-fiasco)
+(fiasco:define-test-package #:tokyo.tojo.json-parser/fiasco-test-package)
+
+(coalton-fiasco-init #:tokyo.tojo.json-parser/fiasco-test-package)
+
+(cl:defun run-tests ()
+  (fiasco:run-package-tests
+   :packages '(#:tokyo.tojo.json-parser/fiasco-test-package)
+   :interactive cl:t))
 
 (define-test parse-json-symbol-test ()
-  (is (pipe "null"
-            parse-json
-            (== (Ok JSON-Null))))
-  (is (pipe "true"
-            parse-json
-            (== (Ok (JSON-Boolean True)))))
-  (is (pipe "false"
-            parse-json
-            (== (Ok (JSON-Boolean False)))))
-  (is (pipe (parse-json "nil")
-            result:err?)))
+  (matches (Ok JSON-Null)
+      (parse-json "null"))
+  (matches (Ok (JSON-Boolean True))
+      (parse-json "true"))
+  (matches (Ok (JSON-Boolean False))
+      (parse-json "false"))
+  (matches (Err _)
+      (parse-json "nil")))
 
 (define-test parse-json-number-test ()
-  (is (pipe "42"
-            parse-json
-            (== (Ok (JSON-Number (JSON-Integer 42))))))
-  (is (pipe "  42.0  "
-            parse-json
-            (== (Ok (JSON-Number (JSON-Float 42.0d0))))))
-  (is (pipe "   42e0"
-            parse-json
-            (== (Ok (JSON-Number (JSON-Float 42.0d0))))))
-  (is (pipe "42e001"
-            parse-json
-            (== (Ok (JSON-Number (JSON-Float 420d0))))))
-  (is (pipe "42e2"
-            parse-json
-            (== (Ok (JSON-Number (JSON-Float 4200d0))))))
-  (is (pipe "123456789"
-            parse-json
-            (== (Ok (JSON-Number (JSON-Integer 123456789))))))
-  (is (pipe "42e+2"
-            parse-json
-            (== (Ok (JSON-Number (JSON-Float 4200d0))))))
-  (is (pipe "42e-2"
-            parse-json
-            (== (Ok (JSON-Number (JSON-Float 0.42d0))))))
-  (is (pipe "0123"
-            parse-json
-            result:err?))
-  (is (pipe "133."
-            parse-json
-            result:err?))
-  (is (pipe (parse-json "133a")
-            result:err?)))
+  (matches (Ok (JSON-Number (JSON-Integer 42)))
+      (parse-json "42"))
+  (matches (Ok (JSON-Number (JSON-Float 42.0d0)))
+      (parse-json "  42.0  "))
+  (matches (Ok (JSON-Number (JSON-Float 42.0d0)))
+      (parse-json "   42e0"))
+  (matches (Ok (JSON-Number (JSON-Float 420d0)))
+      (parse-json "42e001"))
+  (matches (Ok (JSON-Number (JSON-Float 4200d0)))
+      (parse-json "42e2"))
+  (matches (Ok (JSON-Number (JSON-Integer 123456789)))
+      (parse-json "123456789"))
+  (matches (Ok (JSON-Number (JSON-Float 4200d0)))
+      (parse-json "42e+2"))
+  (matches (Ok (JSON-Number (JSON-Float 0.42d0)))
+      (parse-json "42e-2"))
+  (matches (Err _)
+      (parse-json "0123"))
+  (matches (Err _)
+      (parse-json "133."))
+  (matches (Err _)
+      (parse-json "133a")))
 
 (define-test parse-json-string-test ()
-  (is (pipe "\"hello\""
-            parse-json
-            (== (Ok (JSON-String "hello"))))))
+  (matches (Ok (JSON-String "hello"))
+      (parse-json "\"hello\"")))
 
 (define-test parse-json-array-test ()
   (is (pipe "[\"hello\", 3, true, false  ]"
@@ -73,12 +64,10 @@
                                 (JSON-Number (JSON-Integer 3))
                                 (JSON-Boolean True)
                                 (JSON-Boolean False)))))))
-  (is (pipe "[133, ]"
-            parse-json
-            result:err?))
-  (is (pipe "[133, , 3]"
-            parse-json
-            result:err?))
+  (matches (Err _)
+      (parse-json "[133, ]"))
+  (matches (Err _)
+      (parse-json "[133, , 3]"))
   (is (pipe (parse-json "[133, [1, 2, 3], 3]")
             (== (Ok (JSON-Array
                      (make-list (JSON-Number (JSON-Integer 133))
@@ -117,12 +106,9 @@
                                                    (JSON-Number (JSON-Float 3.2d0))
                                                    (JSON-String "test"))))
                                 (Tuple "null" JSON-Null)))))))
-  (is (pipe "{}"
-            parse-json
-            (== (Ok (JSON-Object map:empty)))))
-  (is (pipe "{,}"
-            parse-json
-            result:err?))
-  (is (pipe "{\"test\" : 42,}"
-            parse-json
-            result:err?)))
+  (matches (Ok (JSON-Object map:empty))
+      (parse-json "{}"))
+  (matches (Err _)
+      (parse-json "{,}"))
+  (matches (Err _)
+      (parse-json "{\"test\" : 42,}")))
