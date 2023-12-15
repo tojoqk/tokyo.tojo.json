@@ -22,6 +22,8 @@
 
 (cl:in-package #:tokyo.tojo.json-parser/json-parser)
 
+(named-readtables:in-readtable coalton:coalton)
+
 (coalton-toplevel
   (define-type JSON-Number
     (JSON-Integer Integer)

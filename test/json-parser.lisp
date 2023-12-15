@@ -9,8 +9,9 @@
 
 (in-package #:tokyo.tojo.json-parser-test)
 
-(coalton-fiasco-init #:tokyo.tojo.json-parser-test-fiasco)
+(named-readtables:in-readtable coalton:coalton)
 
+(coalton-fiasco-init #:tokyo.tojo.json-parser-test-fiasco)
 
 (define-test parse-json-symbol-test ()
   (is (pipe "null"
