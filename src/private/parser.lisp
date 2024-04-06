@@ -115,13 +115,13 @@
     (Parser
      (fn (in)
        (let ((out (lisp-make-string-output-sream))
-             (in* (cell:new in)))
-         (while-let (Some (Tuple c next)) = (end-or-read! end? (cell:read in*))
-                    (cell:write! in* next)
+             (cell (cell:new in)))
+         (while-let (Some (Tuple c next)) = (end-or-read! end? (cell:read cell))
+                    (cell:write! cell next)
                     (lisp-write-char! c out))
          (Ok
           (Tuple (lisp-get-output-stream-string out)
-                 (cell:read in*)))))))
+                 (cell:read cell)))))))
 
   (declare error (:e -> Parser :e :a))
   (define (error msg)
