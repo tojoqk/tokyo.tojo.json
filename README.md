@@ -1,4 +1,4 @@
-# json-parser
+# json
 
 This is a JSON parser implemented in Coalton.
 
@@ -11,13 +11,13 @@ https://github.com/coalton-lang/coalton
 Next, place json-parser in your local repository (`~/common-lisp`, etc.).
 
 ```shell:~/common-lisp
-git clone https://github.com/tojoqk/json-parser.git
+git clone https://github.com/tojoqk/json.git
 ```
 
 If you are using Quicklisp, you can load the system with the following.
 
 ```lisp
-(ql:quickload :tokyo.tojo.json-parser)
+(ql:quickload :tokyo.tojo.json)
 ```
 
 ## Examples
@@ -27,7 +27,8 @@ If you are using Quicklisp, you can load the system with the following.
   (:use #:coalton
         #:coalton-prelude)
   (:local-nicknames
-   (#:parser #:tokyo.tojo.json-parser)
+   (#:parser #:tokyo.tojo.json/parser)
+   (#:json #:tokyo.tojo.json/json)
    (#:map #:coalton-library/ord-map)))
 
 (in-package #:json-parser-example)
@@ -35,38 +36,37 @@ If you are using Quicklisp, you can load the system with the following.
 (named-readtables:in-readtable coalton:coalton)
 
 (coalton-toplevel
-  (declare get-number (parser:JSON -> (Optional Double-Float)))
+  (declare get-number (json:JSON -> (Optional Double-Float)))
   (define (get-number x)
     (match x
-      ((parser:JSON-Number (parser:JSON-Integer n)) (as-optional (tryInto n)))
-      ((parser:JSON-Number (parser:JSON-Float n)) (Some n))
+      ((json:Number n) (Some n))
       (_ None)))
 
-  (declare get-string (parser:JSON -> (Optional String)))
+  (declare get-string (json:JSON -> (Optional String)))
   (define (get-string x)
     (match x
-      ((parser:JSON-String str) (Some str))
+      ((json:String str) (Some str))
       (_ None)))
 
-  (declare get-object (parser:JSON -> (Optional (map:Map String parser:JSON))))
+  (declare get-object (json:JSON -> (Optional (map:Map String json:JSON))))
   (define (get-object x)
     (match x
-      ((parser:JSON-Object m) (Some m))
+      ((json:Object m) (Some m))
       (_ None)))
 
   (declare eval (String -> (Optional Double-Float)))
   (define (eval str)
     (do (json <- (as-optional (parser:parse str)))
         (obj <- (get-object json))
-        (left <- (>>= (map:lookup obj "left")
-                      get-number))
-        (op <- (>>= (map:lookup obj "op")
-                    get-string))
-        (right <- (>>= (map:lookup obj "right")
-                       get-number))
-        (match op
-          ("+" (pure (+ left right)))
-          (_ (default))))))
+      (left <- (>>= (map:lookup obj "left")
+                    get-number))
+      (op <- (>>= (map:lookup obj "op")
+                  get-string))
+      (right <- (>>= (map:lookup obj "right")
+                     get-number))
+      (match op
+        ("+" (pure (+ left right)))
+        (_ (default))))))
 ```
 
 in REPL:
@@ -74,9 +74,9 @@ in REPL:
 ```lisp
 CL-USER> (in-package #:json-parser-example)
 #<COMMON-LISP:PACKAGE "JSON-PARSER-EXAMPLE">
-JSON-PARSER-EXAMPLE> (eval "{\"left\": 10, \"op\": \"+\", \"right\": 32.0}")
+JSON-PARSER-EXAMPLE> (coalton (eval "{\"left\": 10, \"op\": \"+\", \"right\": 32.0}"))
 #.(SOME 42.0d0)
-JSON-PARSER-EXAMPLE> (eval "{\"left\": 10, \"op\": \"-\", \"right\": 32.0}")
+JSON-PARSER-EXAMPLE> (coalton (eval "{\"left\": 10, \"op\": \"-\", \"right\": 32.0}"))
 #.NONE
 JSON-PARSER-EXAMPLE>
 ```
