@@ -33,6 +33,17 @@
        (let c_ = (iter:next! iter))
        (Some (Tuple c (%Stream c_ iter))))))
 
+  (declare end-or-read! ((Char -> Boolean) -> Stream -> Optional (Tuple Char Stream)))
+  (define (end-or-read! end? (%Stream opt iter))
+    (match opt
+      ((Some c)
+       (if (end? c)
+           None
+           (progn
+             (let c_ = (iter:next! iter))
+             (Some (Tuple c (%Stream c_ iter))))))
+      ((None) None)))
+
   (define-type (Parser :e :a) (Parser (Stream -> Result :e (Tuple :a Stream))))
 
   (define-instance (Functor (Parser :e))
@@ -105,15 +116,9 @@
      (fn (in)
        (let ((out (lisp-make-string-output-sream))
              (in* (cell:new in)))
-         (while (match (peek (cell:read in*))
-                  ((Some x) (not (end? x)))
-                  ((None) False))
-           (match (read! (cell:read in*))
-             ((Some (Tuple x in_))
-              (progn
-                (cell:swap! in* in_)
-                (lisp-write-char! x out)))
-             (_ Unit)))
+         (while-let (Some (Tuple c next)) = (end-or-read! end? (cell:read in*))
+                    (cell:write! in* next)
+                    (lisp-write-char! c out))
          (Ok
           (Tuple (lisp-get-output-stream-string out)
                  (cell:read in*)))))))
