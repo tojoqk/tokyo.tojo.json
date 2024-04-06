@@ -8,9 +8,14 @@
   (:export #:Parser
            #:Stream
            #:peek-char
+           #:peek-char-or-eof
+           #:read-char-or-eof
            #:read-char
            #:take-until-string
-           #:error
+           #:guard
+           #:Error
+           #:Message
+           #:UnexpectedEof
            #:make-stream!
            #:run!))
 
@@ -44,9 +49,9 @@
              (Some (Tuple c (%Stream c_ iter))))))
       ((None) None)))
 
-  (define-type (Parser :e :a) (Parser (Stream -> Result :e (Tuple :a Stream))))
+  (define-type (Parser :a) (Parser (Stream -> Result Error (Tuple :a Stream))))
 
-  (define-instance (Functor (Parser :e))
+  (define-instance (Functor Parser)
     (define (map f (Parser parse!))
       (Parser
        (fn (in)
@@ -54,7 +59,7 @@
               (fn ((Tuple x in_))
                 (pure (Tuple (f x) in_))))))))
 
-  (define-instance (Applicative (Parser :e))
+  (define-instance (Applicative Parser)
     (define (pure p)
       (Parser (fn (in) (Ok (Tuple p in)))))
 
@@ -67,7 +72,7 @@
                      (fn ((Tuple y in__))
                        (pure (Tuple (op x y) in__))))))))))
 
-  (define-instance (Monad (Parser :e))
+  (define-instance (Monad Parser)
     (define (>>= (Parser parse!) f)
       (Parser
        (fn (in)
@@ -79,17 +84,36 @@
                         (fn ((Tuple x_ in__))
                           (pure (Tuple x_ in__))))))))))))
 
-  (declare peek-char (Parser :e (Optional Char)))
-  (define peek-char
+  (define-instance (MonadFail Parser)
+    (define (fail msg)
+      (Parser (const (Err (Message msg))))))
+
+  (declare peek-char-or-eof (Parser (Optional Char)))
+  (define peek-char-or-eof
     (Parser (fn (in) (Ok (Tuple (peek in) in)))))
 
-  (declare read-char (Parser :e (Optional Char)))
+  (declare peek-char (Parser Char))
+  (define peek-char
+    (do (opt <- peek-char-or-eof)
+        (match opt
+          ((Some c) (pure c))
+          ((None) (Parser (const (Err UnexpectedEof)))))))
+
+  (declare read-char-or-eof (Parser (Optional Char)))
+  (define read-char-or-eof
+    (Parser
+     (fn (in)
+       (match (read! in)
+         ((Some (Tuple c in_))  (Ok (Tuple (Some c) in_)))
+         ((None) (Ok (Tuple None in)))))))
+
+  (declare read-char (Parser Char))
   (define read-char
     (Parser
      (fn (in)
        (match (read! in)
-         ((Some (Tuple c in_)) (Ok (Tuple (Some c) in_)))
-         ((None) (Ok (Tuple None in)))))))
+         ((Some (Tuple c in_)) (Ok (Tuple c in_)))
+         ((None) (Err UnexpectedEof))))))
 
   (repr :native cl:stream)
   (define-type Lisp-Stream)
@@ -110,7 +134,7 @@
     (lisp String (s)
       (cl:get-output-stream-string s)))
 
-  (declare take-until-string ((Char -> Boolean) -> Parser :e String))
+  (declare take-until-string ((Char -> Boolean) -> Parser String))
   (define (take-until-string end?)
     (Parser
      (fn (in)
@@ -123,15 +147,22 @@
           (Tuple (lisp-get-output-stream-string out)
                  (cell:read cell)))))))
 
-  (declare error (:e -> Parser :e :a))
-  (define (error msg)
-    (Parser (fn (_) (Err msg))))
+  (define-type Error
+    UnexpectedEof
+    (Message String))
+
+  (define-instance (Eq Error)
+    (define (== a b)
+      (match (Tuple a b)
+        ((Tuple (UnexpectedEof) (UnexpectedEof)) True)
+        ((Tuple (Message x) (Message y)) (== x y))
+        (_ False))))
 
   (declare make-stream! (iter:Iterator Char -> Stream))
   (define (make-stream! iter)
     (%Stream (iter:next! iter) iter))
 
-  (declare run! (Parser :e :a -> Stream -> Result :e :a))
+  (declare run! (Parser :a -> Stream -> Result Error :a))
   (define (run! (Parser parse!) in)
     (>>= (parse! in)
          (fn ((Tuple x _))
