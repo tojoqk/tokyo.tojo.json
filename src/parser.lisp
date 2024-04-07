@@ -280,42 +280,46 @@
 
   (declare number-parser (parser:Parser Double-Float))
   (define number-parser
-    (let integer-parser =
-      (fn (head)
-        (match (str:parse-int head)
-          ((None) (fail (message-with "Unexpected string" head)))
-          ((Some int)
-           (match (tryInto int)
-             ((Ok d) (pure d))
-             ((Err _) (fail (message-with "Unexpected string" head))))))))
-    (let float-parser =
-      (fn (head fraction exponent)
-        (match (parse-float head fraction exponent)
-          ((None)
-           (fail (message-with "Unexpected string" (mconcat
-                                                    (make-list head "." fraction "e" exponent)))))
-          ((Some float)
-           (pure float)))))
-    (let head-parser =
-      (progn
-        (let sign-parser =
-          (fn (continue-parser)
-            (parser:from-guard
-             (alt*
-              (parser:guard-char (== #\-)
-                                 (>> parser:read-char
-                                     (liftA2 <> (pure "-") continue-parser)))
-              (parser:guard-else continue-parser)))))
-        (sign-parser
-         (parser:from-guard
-          (alt*
-           (parser:guard-char (== #\0)
-                              (do (digits <- digits-parser)
-                                  (if (== digits "0")
-                                      (pure digits)
-                                      (fail (message-with "Unexpected string" digits)))))
-           (parser:guard-char digit1-9? digits-parser))))))
-    (let ((declare fraction-parser (String -> (parser:Parser Double-Float)))
+    (let ((declare integer-parser (String -> parser:Parser Double-Float))
+          (integer-parser
+            (fn (head)
+              (match (str:parse-int head)
+                ((None) (fail (message-with "Unexpected string" head)))
+                ((Some int)
+                 (match (tryInto int)
+                   ((Ok d) (pure d))
+                   ((Err _) (fail (message-with "Unexpected string" head))))))))
+
+          (declare float-parser (String -> String -> String -> parser:Parser Double-Float))
+          (float-parser
+            (fn (head fraction exponent)
+              (match (parse-float head fraction exponent)
+                ((None)
+                 (fail (message-with "Unexpected string" (mconcat
+                                                          (make-list head "." fraction "e" exponent)))))
+                ((Some float)
+                 (pure float)))))
+
+          (declare head-parser (parser:Parser String))
+          (head-parser
+            (let ((sign-parser
+                    (fn (continue-parser)
+                      (parser:from-guard
+                       (alt* (parser:guard-char (== #\-)
+                                                (>> parser:read-char
+                                                    (liftA2 <> (pure "-") continue-parser)))
+                             (parser:guard-else continue-parser)))))
+                  (main-parser
+                    (parser:from-guard
+                     (alt* (parser:guard-char (== #\0)
+                                              (do (digits <- digits-parser)
+                                                  (if (== digits "0")
+                                                      (pure digits)
+                                                      (fail (message-with "Unexpected string" digits)))))
+                           (parser:guard-char digit1-9? digits-parser)))))
+              (sign-parser main-parser)))
+
+          (declare fraction-parser (String -> (parser:Parser Double-Float)))
           (fraction-parser
             (fn (head)
               (>> parser:read-char
@@ -328,6 +332,7 @@
                                               (parser:delay (exponent-parser head fraction)))
                            (parser:guard-char sep?
                                               (parser:delay (float-parser head fraction "0"))))))))))
+
           (declare exponent-parser (String -> String -> (parser:Parser Double-Float)))
           (exponent-parser
             (fn (head fraction)
@@ -344,6 +349,7 @@
                     (parser:guard-char (const True)
                                        (>>= digits-parser
                                             (float-parser head fraction)))))))))
+
       (>>= head-parser
            (fn (head)
              (parser:from-guard
