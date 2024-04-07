@@ -6,7 +6,8 @@
    (#:iter #:coalton-library/iterator)
    (#:cell #:coalton-library/cell)
    (#:optional #:coalton-library/optional)
-   (#:map #:coalton-library/ord-map))
+   (#:map #:coalton-library/ord-map)
+   (#:output #:tokyo.tojo.json/private/output-stream))
   (:export #:Parser
            #:Stream
            #:peek-char
@@ -203,36 +204,17 @@
          ((Some (Tuple c in_)) (Ok (Tuple c in_)))
          ((None) (Err UnexpectedEof))))))
 
-  (repr :native cl:stream)
-  (define-type Lisp-Stream)
-
-  (declare lisp-write-char! (Char -> Lisp-Stream -> Unit))
-  (define (lisp-write-char! c s)
-    (lisp Unit (c s)
-      (cl:write-char c s)
-      Unit))
-
-  (declare lisp-make-string-output-sream (Unit -> Lisp-Stream))
-  (define (lisp-make-string-output-sream)
-    (lisp Lisp-Stream ()
-      (cl:make-string-output-stream)))
-
-  (declare lisp-get-output-stream-string (Lisp-Stream -> String))
-  (define (lisp-get-output-stream-string s)
-    (lisp String (s)
-      (cl:get-output-stream-string s)))
-
   (declare take-until-string ((Char -> Boolean) -> Parser String))
   (define (take-until-string end?)
     (Parser
      (fn (in)
-       (let ((out (lisp-make-string-output-sream))
+       (let ((out (output:make-string-output-stream))
              (cell (cell:new in)))
          (while-let (Some (Tuple c next)) = (end-or-read! end? (cell:read cell))
                     (cell:write! cell next)
-                    (lisp-write-char! c out))
+                    (output:write-char c out))
          (Ok
-          (Tuple (lisp-get-output-stream-string out)
+          (Tuple (output:get-output-stream-string out)
                  (cell:read cell)))))))
 
   (define-type Error
