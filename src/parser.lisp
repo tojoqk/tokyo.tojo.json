@@ -91,27 +91,24 @@
 
   (declare null-parser (parser:Parser Unit))
   (define null-parser
-    (>>= (non-empty-string word-parser)
-         (fn (word)
-           (if (== word "null")
-               (pure Unit)
-               (fail (message-with "Unexpected string" word))))))
+    (do (word <- (non-empty-string word-parser))
+        (if (== word "null")
+            (pure Unit)
+            (fail (message-with "Unexpected string" word)))))
 
   (declare true-parser (parser:Parser Boolean))
   (define true-parser
-    (>>= (non-empty-string word-parser)
-         (fn (word)
-           (if (== word "true")
-               (pure True)
-               (fail (message-with "Unexpected empty string" word))))))
+    (do (word <- (non-empty-string word-parser))
+         (if (== word "true")
+             (pure True)
+             (fail (message-with "Unexpected empty string" word)))))
 
   (declare false-parser (parser:Parser Boolean))
   (define false-parser
-    (>>= (non-empty-string word-parser)
-         (fn (word)
-           (if (== word "false")
-               (pure False)
-               (fail (message-with "Unexpected string" word))))))
+    (do (word <- (non-empty-string word-parser))
+        (if (== word "false")
+            (pure False)
+            (fail (message-with "Unexpected string" word)))))
 
   (declare escape-char-map (map:Map Char String))
   (define escape-char-map
@@ -135,116 +132,116 @@
   (define (take-parser n)
     (map into
          (foldr (liftA2 Cons)
-                (pure (make-list))
+                (pure nil)
                 (list:repeat n parser:peek-char))))
 
-  (define string-parser (parser:delay (string-parser_)))
-
-  (declare string-parser_ (Unit -> parser:Parser String))
-  (define (string-parser_)
-    (let ((declare start-parser (Unit -> (parser:Parser (List String))))
-          (start-parser
+  (declare string-parser (parser:Parser String))
+  (define string-parser
+    (let ((declare string-list-parser (Unit -> (parser:Parser (List String))))
+          (string-list-parser
             (fn ()
-              (let ((escape-parser
-                      (parser:from-guard
-                       (alt*
-                        (parser:guard-lookup escape-char-map
-                                             (fn (str)
-                                               (>> parser:read-char
-                                                   (liftA2 cons (pure str) (start-parser)))))
-                        (parser:guard-char (== #\u)
-                                           (do parser:read-char
-                                               (str <- (take-parser 4))
-                                             (match (>>= (parse-hex str) char:code-char)
-                                               ((None)
-                                                (fail (message-with "Unexpected string" str)))
-                                               ((Some c)
-                                                (liftA2 Cons
-                                                        (pure (into (make-list c)))
-                                                        (start-parser)))))))))
-                    (str-parser
-                      (take-until-parser (disjoin (== #\\) (== #\")))))
-                (parser:from-guard
-                 (alt* (parser:guard-char (== #\")
-                                          (>> parser:read-char
-                                              (pure (make-list))))
-                       (parser:guard-char (== #\\)
-                                          (>> parser:read-char
-                                              escape-parser))
-                       (parser:guard-char (const True)
-                                          (>>= str-parser
-                                               (fn (str)
-                                                 (liftA2 Cons (pure str) (start-parser)))))))))))
-      (>>= (>> parser:read-char
-               (start-parser))
-           (fn (lst)
-             (pure (mconcat lst))))))
+              (parser:from-guard
+               (alt* (parser:guard-char (== #\")
+                                        (>> parser:read-char
+                                            (pure (make-list))))
+                     (parser:guard-char (== #\\)
+                                        (>> parser:read-char
+                                            (string-list/escape-parser)))
+                     (parser:guard-char (const True)
+                                        (do (str <- (take-until-parser (disjoin (== #\\) (== #\"))))
+                                            (liftA2 Cons (pure str) (string-list-parser))))))))
+
+          (declare string-list/escape-parser (Unit -> (parser:Parser (List String))))
+          (string-list/escape-parser
+            (fn ()
+              (parser:from-guard
+               (alt*
+                (parser:guard-lookup escape-char-map
+                                     (fn (str)
+                                       (>> parser:read-char
+                                           (liftA2 cons (pure str) (string-list-parser)))))
+                (parser:guard-char (== #\u)
+                                   (do parser:read-char
+                                       (str <- (take-parser 4))
+                                     (match (>>= (parse-hex str) char:code-char)
+                                       ((None)
+                                        (fail (message-with "Unexpected string" str)))
+                                       ((Some c)
+                                        (liftA2 Cons
+                                                (pure (into (make-list c)))
+                                                (string-list-parser)))))))))))
+      (do parser:read-char
+          (lst <- (string-list-parser))
+        (pure (mconcat lst)))))
 
   (declare array-parser (parser:Parser (List json:JSON)))
-  (define array-parser
-    (let ((start-parser
+  (define array-parser (parser:delay (array-parser_)))
+
+  (declare array-parser_ (Unit -> (parser:Parser (List json:JSON))))
+  (define (array-parser_)
+    (let ((declare elements-parser (Unit -> (parser:Parser (List json:JSON))))
+          (elements-parser
             (fn ()
-              (let ((continue-parser
-                      (fn (value)
-                        (do whitespace-parser
-                            (parser:from-guard
-                             (alt*
-                              (parser:guard-char (== #\])
-                                                 (>> parser:read-char
-                                                     (pure (make-list value))))
-                              (parser:guard-char (== #\,)
-                                                 (>> parser:read-char
-                                                     (liftA2 Cons (pure value) (start-parser))))))))))
-                (>>= json-parser continue-parser)))))
+              (do (value <- json-parser)
+                  whitespace-parser
+                (parser:from-guard
+                 (alt* (parser:guard-char (== #\])
+                                          (>> parser:read-char
+                                              (pure (make-list value))))
+                       (parser:guard-char (== #\,)
+                                          (>> parser:read-char
+                                              (liftA2 Cons (pure value) (elements-parser))))))))))
       (do parser:read-char
           whitespace-parser
         (parser:from-guard
-         (alt*
-          (parser:guard-char (== #\])
-                             (>> parser:read-char
-                                 (pure Nil)))
-          (parser:guard-char (const True)
-                             (parser:delay (start-parser))))))))
+         (alt* (parser:guard-char (== #\])
+                                  (>> parser:read-char
+                                      (pure Nil)))
+               (parser:guard-char (const True)
+                                  (parser:delay (elements-parser))))))))
 
   (define object-parser (parser:delay (object-parser_)))
 
   (define (object-parser_)
-    (let key-parser = (string-parser_))
-    (let value-parser = (>> whitespace-parser json-parser))
-    (let key-value-parser =
-      (do (key <- key-parser)
-          whitespace-parser
-        (parser:from-guard
-         (parser:guard-char (== #\:)
-                            (do parser:read-char
-                                (value <- value-parser)
-                              (pure (Tuple key value)))))))
-    (let ((start-parser
+    (let ((declare key-parser (parser:Parser String))
+          (key-parser string-parser)
+
+          (declare value-parser (parser:Parser json:JSON))
+          (value-parser (>> whitespace-parser json-parser))
+
+          (declare key-value-parser (parser:Parser (Tuple String json:JSON)))
+          (key-value-parser
+            (do (key <- key-parser)
+                whitespace-parser
+              (parser:from-guard
+               (parser:guard-char (== #\:)
+                                  (do parser:read-char
+                                      (value <- value-parser)
+                                    (pure (Tuple key value)))))))
+
+          (declare map-parser (Unit -> parser:Parser (map:Map String json:JSON)))
+          (map-parser
             (fn ()
-              (let ((continue-parser
-                      (fn ((Tuple key value))
-                        (do whitespace-parser
-                            (parser:from-guard
-                             (alt*
-                              (parser:guard-char (== #\,)
-                                                 (do parser:read-char
-                                                     (map <- (start-parser))
-                                                   (pure (map:insert-or-replace map key value))))
-                              (parser:guard-char (== #\})
-                                                 (do parser:read-char
-                                                     (pure (map:insert-or-replace map:empty key value))))))))))
-                (do whitespace-parser
-                    (parser:from-guard
-                     (parser:guard-char (== #\")
-                                        (>>= key-value-parser continue-parser))))))))
+              (do whitespace-parser
+                  (parser:from-guard
+                   ((parser:guard-char (== #\"))
+                    (do ((Tuple key value) <- key-value-parser)
+                        whitespace-parser
+                      (parser:from-guard
+                       (alt* (parser:guard-char (== #\,)
+                                                (do parser:read-char
+                                                    (map <- (map-parser))
+                                                  (pure (map:insert-or-replace map key value))))
+                             (parser:guard-char (== #\})
+                                                (do parser:read-char
+                                                    (pure (map:insert-or-replace map:empty key value)))))))))))))
       (do parser:read-char
           whitespace-parser
         (parser:from-guard
-         (alt*
-          (parser:guard-char (== #\})
-                             (>> parser:read-char (pure map:empty)))
-          (parser:guard-char (const True)
-                             (parser:delay (start-parser))))))))
+         (alt* (parser:guard-char (== #\})
+                                  (>> parser:read-char (pure map:empty)))
+               (parser:guard-char (const True)
+                                  (parser:delay (map-parser))))))))
 
   (declare digits-parser (parser:Parser String))
   (define digits-parser
