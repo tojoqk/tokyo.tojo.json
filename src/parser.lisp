@@ -8,6 +8,7 @@
    (#:list #:coalton-library/list)
    (#:fn #:coalton-library/functions)
    (#:char #:coalton-library/char)
+   (#:optional #:coalton-library/optional)
    (#:json #:tokyo.tojo.json/json)
    (#:parser #:tokyo.tojo.json/private/parser))
   (:export #:parse
@@ -16,6 +17,13 @@
 (in-package #:tokyo.tojo.json/parser)
 
 (named-readtables:in-readtable coalton:coalton)
+
+(cl:defmacro alt* (cl:&rest xs)
+  (cl:check-type xs cl:list)
+  (cl:if (cl:null xs)
+         'empty
+         `(alt ,(cl:first xs)
+               (alt* ,@(cl:rest xs)))))
 
 (coalton-toplevel
   (declare digit? (Char -> Boolean))
@@ -39,15 +47,12 @@
   (define whitespace-parser (parser:delay (whitespace-parser_)))
 
   (define (whitespace-parser_)
-    (>>= parser:peek-char-or-eof
-         (fn (opt)
-           (match opt
-             ((None) (pure Unit))
-             ((Some c)
-              (if (whitespace? c)
-                  (>> parser:read-char
-                      (whitespace-parser_))
-                  (pure Unit)))))))
+    (parser:from-guard
+     (alt*
+      (parser:guard-char whitespace?
+                         (>> parser:read-char
+                             (parser:delay (whitespace-parser_))))
+      (parser:guard-else (pure Unit)))))
 
   (declare parse-hex (String -> (Optional UFix)))
   (define (parse-hex str)
@@ -123,6 +128,9 @@
             (Tuple #\r (into (make-list #\return)))
             (Tuple #\t (into (make-list #\tab))))))
 
+  (define (escape-char? c)
+    (optional:some? (map:lookup escape-char-map c)))
+
   (declare take-parser (UFix -> (parser:Parser string)))
   (define (take-parser n)
     (map into
@@ -138,39 +146,35 @@
           (start-parser
             (fn ()
               (let ((escape-parser
-                      (>>= parser:read-char
-                           (fn (c)
-                             (match (map:lookup escape-char-map c)
-                               ((Some str) (liftA2 cons (pure str) (start-parser)))
-                               ((None)
-                                (if (== c #\u)
-                                    (>>= (take-parser 4)
-                                         (fn (str)
-                                           (match (>>= (parse-hex str) char:code-char)
-                                             ((None)
-                                              (fail (message-with "Unexpected string" str)))
-                                             ((Some c)
-                                              (liftA2 Cons
-                                                      (pure (into (make-list c)))
-                                                      (start-parser))))))
-                                    (fail (message-with "Unexpected char" (make-list c)))))))))
+                      (parser:from-guard
+                       (alt*
+                        (parser:guard-lookup escape-char-map
+                                             (fn (str)
+                                               (>> parser:read-char
+                                                   (liftA2 cons (pure str) (start-parser)))))
+                        (parser:guard-char (== #\u)
+                                           (do parser:read-char
+                                               (str <- (take-parser 4))
+                                             (match (>>= (parse-hex str) char:code-char)
+                                               ((None)
+                                                (fail (message-with "Unexpected string" str)))
+                                               ((Some c)
+                                                (liftA2 Cons
+                                                        (pure (into (make-list c)))
+                                                        (start-parser)))))))))
                     (str-parser
-                      (take-until-parser
-                       (fn (c)
-                         (or (== c #\\)
-                             (== c #\"))))))
-                (>>= parser:peek-char
-                     (fn (c)
-                       (cond ((== c #\")
-                              (>> parser:read-char
-                                  (pure (make-list))))
-                             ((== c #\\)
-                              (>> parser:read-char
-                                  escape-parser))
-                             (True
-                              (>>= str-parser
-                                   (fn (str)
-                                     (liftA2 Cons (pure str) (start-parser))))))))))))
+                      (take-until-parser (disjoin (== #\\) (== #\")))))
+                (parser:from-guard
+                 (alt* (parser:guard-char (== #\")
+                                          (>> parser:read-char
+                                              (pure (make-list))))
+                       (parser:guard-char (== #\\)
+                                          (>> parser:read-char
+                                              escape-parser))
+                       (parser:guard-char (const True)
+                                          (>>= str-parser
+                                               (fn (str)
+                                                 (liftA2 Cons (pure str) (start-parser)))))))))))
       (>>= (>> parser:read-char
                (start-parser))
            (fn (lst)
@@ -182,74 +186,65 @@
             (fn ()
               (let ((continue-parser
                       (fn (value)
-                        (>>= (>> whitespace-parser
-                                 parser:read-char)
-                             (fn (c)
-                               (cond
-                                 ((== c #\]) (pure (make-list value)))
-                                 ((== c #\,) (liftA2 Cons (pure value) (start-parser)))
-                                 (True (fail (message-with "Unexpected char" (make-list c))))))))))
+                        (do whitespace-parser
+                            (parser:from-guard
+                             (alt*
+                              (parser:guard-char (== #\])
+                                                 (>> parser:read-char
+                                                     (pure (make-list value))))
+                              (parser:guard-char (== #\,)
+                                                 (>> parser:read-char
+                                                     (liftA2 Cons (pure value) (start-parser))))))))))
                 (>>= json-parser continue-parser)))))
-      (>> parser:read-char
-          (>> whitespace-parser
-              (>>= parser:peek-char
-                   (fn (c)
-                     (if (== c #\])
-                         (>> parser:read-char
-                             (pure Nil))
-                         (start-parser))))))))
+      (do parser:read-char
+          whitespace-parser
+        (parser:from-guard
+         (alt*
+          (parser:guard-char (== #\])
+                             (>> parser:read-char
+                                 (pure Nil)))
+          (parser:guard-char (const True)
+                             (parser:delay (start-parser))))))))
 
   (define object-parser (parser:delay (object-parser_)))
 
-  (declare object-parser_ (Unit -> parser:Parser (map:Map String json:JSON)))
   (define (object-parser_)
-    (let key-parser = string-parser)
+    (let key-parser = (string-parser_))
     (let value-parser = (>> whitespace-parser json-parser))
     (let key-value-parser =
-      (>>= key-parser
-           (fn (key)
-             (>>= (>> whitespace-parser
-                      parser:read-char)
-                  (fn (c)
-                    (if (== c #\:)
-                        (>>= value-parser
-                             (fn (value)
-                               (pure (Tuple key value))))
-                        (fail (message-with "Unexpected char" (make-list c)))))))))
+      (do (key <- key-parser)
+          whitespace-parser
+        (parser:from-guard
+         (parser:guard-char (== #\:)
+                            (do parser:read-char
+                                (value <- value-parser)
+                              (pure (Tuple key value)))))))
     (let ((start-parser
             (fn ()
               (let ((continue-parser
                       (fn ((Tuple key value))
-                        (>>= (>> whitespace-parser
-                                 parser:read-char)
-                             (fn (c)
-                               (match c
-                                 (#\,
-                                  (>>= (start-parser)
-                                       (fn (map)
-                                         (pure (map:insert-or-replace map key value)))))
-                                 (#\}
-                                  (pure (map:insert-or-replace map:empty key value)))
-                                 (_
-                                  (fail (message-with "Unexpected char" (make-list c))))))))))
-                (>>= (>> whitespace-parser
-                         parser:peek-char)
-                     (fn (c)
-                       (match c
-                         (#\"
-                          (>>= key-value-parser continue-parser))
-                         (_
-                          (fail (message-with "Unexpected char" (make-list c)))))))))))
-      (>>= (>> parser:read-char
-               (>> whitespace-parser
-                   parser:peek-char))
-           (fn (c)
-             (match c
-               (#\}
-                (>> parser:read-char
-                    (pure map:empty)))
-               (_ (start-parser)))))))
-
+                        (do whitespace-parser
+                            (parser:from-guard
+                             (alt*
+                              (parser:guard-char (== #\,)
+                                                 (do parser:read-char
+                                                     (map <- (start-parser))
+                                                   (pure (map:insert-or-replace map key value))))
+                              (parser:guard-char (== #\})
+                                                 (do parser:read-char
+                                                     (pure (map:insert-or-replace map:empty key value))))))))))
+                (do whitespace-parser
+                    (parser:from-guard
+                     (parser:guard-char (== #\")
+                                        (>>= key-value-parser continue-parser))))))))
+      (do parser:read-char
+          whitespace-parser
+        (parser:from-guard
+         (alt*
+          (parser:guard-char (== #\})
+                             (>> parser:read-char (pure map:empty)))
+          (parser:guard-char (const True)
+                             (parser:delay (start-parser))))))))
 
   (declare digits-parser (parser:Parser String))
   (define digits-parser
@@ -260,17 +255,15 @@
             (fail "Unexpected empty string"))))
     (>>= (take-until-parser (fn:complement digit?))
          (fn (str)
-           (>>= parser:peek-char-or-eof
-                (fn (opt)
-                  (match opt
-                    ((None) (length>0-check str))
-                    ((Some c)
-                     (if (or (sep? c)
-                             (== c #\.)
-                             (== c #\e)
-                             (== c #\E))
-                         (length>0-check str)
-                         (fail (message-with "Unexpected char" (make-list c)))))))))))
+           (parser:from-guard
+            (alt*
+             (parser:guard-eof (parser:delay (length>0-check str)))
+             (parser:guard-char (fn (c)
+                                  (or (sep? c)
+                                      (== c #\.)
+                                      (== c #\e)
+                                      (== c #\E)))
+                                (length>0-check str)))))))
 
   (declare parse-float (String -> String -> String -> (Optional Double-Float)))
   (define (parse-float head fraction exponent)
@@ -307,92 +300,81 @@
       (progn
         (let sign-parser =
           (fn (continue-parser)
-            (>>= parser:peek-char
-                 (fn (c)
-                   (cond
-                     ((== c #\-)
-                      (>> parser:read-char
-                          (liftA2 <> (pure "-") continue-parser)))
-                     (True continue-parser))))))
+            (parser:from-guard
+             (alt*
+              (parser:guard-char (== #\-)
+                                 (>> parser:read-char
+                                     (liftA2 <> (pure "-") continue-parser)))
+              (parser:guard-else continue-parser)))))
         (sign-parser
-         (>>= parser:peek-char
-              (fn (c)
-                (cond
-                  ((== c #\0)
-                   (>>= digits-parser
-                        (fn (digits)
-                          (if (== digits "0")
-                              (pure digits)
-                              (fail (message-with "Unexpected string" digits))))))
-                  ((digit1-9? c) digits-parser)
-                  (True
-                   (fail (message-with "Unexpected char" (make-list c))))))))))
-    (let ((fraction-parser
+         (parser:from-guard
+          (alt*
+           (parser:guard-char (== #\0)
+                              (do (digits <- digits-parser)
+                                  (if (== digits "0")
+                                      (pure digits)
+                                      (fail (message-with "Unexpected string" digits)))))
+           (parser:guard-char digit1-9? digits-parser))))))
+    (let ((declare fraction-parser (String -> (parser:Parser Double-Float)))
+          (fraction-parser
             (fn (head)
               (>> parser:read-char
                   (>>= digits-parser
                        (fn (fraction)
-                         (>>= parser:peek-char-or-eof
-                              (fn (opt)
-                                (match opt
-                                  ((None) (float-parser head fraction "0"))
-                                  ((Some c)
-                                   (cond
-                                     ((or (== c #\e) (== c #\E))
-                                      (exponent-parser head fraction))
-                                     ((sep? c) (float-parser head fraction "0"))
-                                     (True
-                                      (fail (message-with "Unexpected char" (make-list c))))))))))))))
+                         (parser:from-guard
+                          (alt*
+                           (parser:guard-eof (parser:delay (float-parser head fraction "0")))
+                           (parser:guard-char (disjoin (== #\e) (== #\E))
+                                              (parser:delay (exponent-parser head fraction)))
+                           (parser:guard-char sep?
+                                              (parser:delay (float-parser head fraction "0"))))))))))
+          (declare exponent-parser (String -> String -> (parser:Parser Double-Float)))
           (exponent-parser
             (fn (head fraction)
               (>> parser:read-char
-                  (>>= parser:peek-char
-                       (fn (c)
-                         (cond
-                           ((== #\+ c)
-                            (>> parser:read-char
-                                (>>= digits-parser (float-parser head fraction))))
-                           ((== #\- c)
-                            (>> parser:read-char
-                                (>>= (map (<> "-") digits-parser)
-                                     (float-parser head fraction))))
-                           (True
-                            (>>= digits-parser
-                                 (float-parser head fraction))))))))))
+                  (parser:from-guard
+                   (alt*
+                    (parser:guard-char (== #\+)
+                                       (>> parser:read-char
+                                           (>>= digits-parser (float-parser head fraction))))
+                    (parser:guard-char (== #\-)
+                                       (>> parser:read-char
+                                           (>>= (map (<> "-") digits-parser)
+                                                (float-parser head fraction))))
+                    (parser:guard-char (const True)
+                                       (>>= digits-parser
+                                            (float-parser head fraction)))))))))
       (>>= head-parser
            (fn (head)
-             (>>= parser:peek-char-or-eof
-                  (fn (opt)
-                    (match opt
-                      ((None) (integer-parser head))
-                      ((Some c)
-                       (cond
-                         ((== c #\.) (fraction-parser head))
-                         ((or (== c #\e) (== c #\E)) (exponent-parser head "0"))
-                         ((sep? c) (integer-parser head))
-                         (True
-                          (fail (message-with "Unexpected char" (make-list c)))))))))))))
+             (parser:from-guard
+              (alt*
+               (parser:guard-eof (parser:delay (integer-parser head)))
+               (parser:guard-char (== #\.)
+                                  (parser:delay (fraction-parser head)))
+               (parser:guard-char (disjoin (== #\e) (== #\E))
+                                  (parser:delay (exponent-parser head "0")))
+               (parser:guard-char sep?
+                                  (parser:delay (integer-parser head)))))))))
 
   (declare json-parser (parser:Parser json:JSON))
   (define json-parser
     (>> whitespace-parser
-        (into
-         (asum
-          (make-list
-           (parser:guard (== #\n)
-                         (>> null-parser (pure json:Null)))
-           (parser:guard (== #\t)
-                         (map into true-parser))
-           (parser:guard (== #\f)
-                         (map into false-parser))
-           (parser:guard (disjoin digit? (== #\-))
-                         (map into number-parser))
-           (parser:guard (== #\")
-                         (map into string-parser))
-           (parser:guard (== #\[)
-                         (map into array-parser))
-           (parser:guard (== #\{)
-                         (map into object-parser)))))))
+        (parser:from-guard
+         (alt*
+          (parser:guard-char (== #\n)
+                             (>> null-parser (pure json:Null)))
+          (parser:guard-char (== #\t)
+                             (map into true-parser))
+          (parser:guard-char (== #\f)
+                             (map into false-parser))
+          (parser:guard-char (disjoin digit? (== #\-))
+                             (map into number-parser))
+          (parser:guard-char (== #\")
+                             (map into string-parser))
+          (parser:guard-char (== #\[)
+                             (map into array-parser))
+          (parser:guard-char (== #\{)
+                             (map into object-parser))))))
 
   (declare parse! (iter:Iterator Char -> (Result parser:Error json:JSON)))
   (define (parse! iter)

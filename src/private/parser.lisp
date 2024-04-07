@@ -4,7 +4,9 @@
   (:shadow #:error)
   (:local-nicknames
    (#:iter #:coalton-library/iterator)
-   (#:cell #:Coalton-library/cell))
+   (#:cell #:coalton-library/cell)
+   (#:optional #:coalton-library/optional)
+   (#:map #:coalton-library/ord-map))
   (:export #:Parser
            #:Stream
            #:peek-char
@@ -13,6 +15,11 @@
            #:read-char
            #:take-until-string
            #:guard
+           #:guard-char
+           #:guard-eof
+           #:guard-lookup
+           #:guard-else
+           #:from-guard
            #:Error
            #:Message
            #:UnexpectedEof
@@ -99,14 +106,33 @@
 
   (repr :transparent)
   (define-type (Guard :a)
-    (%Guard (Char -> (Optional (Parser :a)))))
+    (%Guard ((Optional Char) -> (Optional (Parser :a)))))
 
-  (declare guard ((Char -> Boolean) -> Parser :a -> Guard :a))
-  (define (guard p? parser)
-    (%Guard (fn (c)
-              (if (p? c)
-                  (Some parser)
-                  None))))
+  (declare guard ((Optional Char -> Optional :in) ->  (:in -> Parser :a) -> Guard :a))
+  (define (guard f make-parser)
+    (%Guard (.> f (map make-parser))))
+
+  (declare alt-guard (Alternative :f => Boolean -> (:f Unit)))
+  (define (alt-guard b)
+    (if b
+        (pure Unit)
+        empty))
+
+  (declare guard-char ((Char -> Boolean) -> Parser :a -> Guard :a))
+  (define (guard-char p? parser)
+    (guard (fn (opt)
+             (do (c <- opt)
+                 (alt-guard (p? c))))
+           (fn ((Unit)) parser)))
+
+  (define (guard-eof parser)
+    (guard (fn (opt)
+             (alt-guard (optional:none? opt)))
+           (fn ((Unit)) parser)))
+
+  (declare guard-else (Parser :a -> Guard :a))
+  (define (guard-else parser)
+    (%Guard (const (pure parser))))
 
   (define-instance (Functor Guard)
     (define (map f (%Guard g))
@@ -133,12 +159,15 @@
                          ((Some _) x2)
                          ((None) None))))))))))
 
-  (define-instance (Into (Guard :a) (Parser :a))
-    (define (into (%Guard g))
-      (do (c <- peek-char)
-          (match (g c)
-            ((Some p) p)
-            ((None) (fail (<> "Unexpected char: " (into (make-list c)))))))))
+  (declare from-guard (Guard :a -> Parser :a))
+  (define (from-guard (%Guard g))
+    (do (opt <- peek-char-or-eof)
+        (match (g opt)
+          ((Some p) p)
+          ((None)
+           (match opt
+             ((Some c) (fail (<> "Unexpected char: " (into (make-list c)))))
+             ((None) (fail "Unexpected eof")))))))
 
   (declare peek-char-or-eof (Parser (Optional Char)))
   (define peek-char-or-eof
