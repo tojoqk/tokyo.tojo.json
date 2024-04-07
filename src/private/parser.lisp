@@ -130,6 +130,13 @@
              (alt-guard (optional:none? opt)))
            (fn ((Unit)) parser)))
 
+  (declare guard-lookup (map:Map Char :b -> (:b -> Parser :a) -> Guard :a))
+  (define (guard-lookup m make-parser)
+    (%Guard (fn (opt)
+              (do (c <- opt)
+                  (x <- (map:lookup m c))
+                (pure (make-parser x))))))
+
   (declare guard-else (Parser :a -> Guard :a))
   (define (guard-else parser)
     (%Guard (const (pure parser))))
