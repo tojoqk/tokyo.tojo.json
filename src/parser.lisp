@@ -130,10 +130,7 @@
 
   (declare take-parser (UFix -> (parser:Parser string)))
   (define (take-parser n)
-    (map into
-         (foldr (liftA2 Cons)
-                (pure nil)
-                (list:repeat n parser:peek-char))))
+    (map into (sequence (list:repeat n parser:peek-char))))
 
   (declare string-parser (parser:Parser String))
   (define string-parser
