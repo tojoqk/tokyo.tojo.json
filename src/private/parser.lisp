@@ -17,11 +17,19 @@
            #:Message
            #:UnexpectedEof
            #:make-stream!
+           #:delay
            #:run!))
 
 (in-package #:tokyo.tojo.json/private/parser)
 
 (named-readtables:in-readtable coalton:coalton)
+
+(cl:defmacro delay (expr)
+  (cl:let ((in (cl:gensym))
+           (parse! (cl:gensym)))
+    `(Parser (fn (,in)
+               (let (Parser ,parse!) = ,expr)
+               (,parse! ,in)))))
 
 (coalton-toplevel
   ;; JSON is LL(1) grammar, so it only requires lookahead of one character.
@@ -49,6 +57,7 @@
              (Some (Tuple c (%Stream c_ iter))))))
       ((None) None)))
 
+  (repr :transparent)
   (define-type (Parser :a) (Parser (Stream -> Result Error (Tuple :a Stream))))
 
   (define-instance (Functor Parser)
@@ -87,6 +96,49 @@
   (define-instance (MonadFail Parser)
     (define (fail msg)
       (Parser (const (Err (Message msg))))))
+
+  (repr :transparent)
+  (define-type (Guard :a)
+    (%Guard (Char -> (Optional (Parser :a)))))
+
+  (declare guard ((Char -> Boolean) -> Parser :a -> Guard :a))
+  (define (guard p? parser)
+    (%Guard (fn (c)
+              (if (p? c)
+                  (Some parser)
+                  None))))
+
+  (define-instance (Functor Guard)
+    (define (map f (%Guard g))
+      (%Guard (fn (c)
+                (map (map f) (g c))))))
+
+  (define-instance (Applicative Guard)
+    (define (pure x)
+      (%Guard (fn (_) (Some (pure x)))))
+    (define (liftA2 f (%Guard g1) (%Guard g2))
+      (%Guard (fn (c)
+                (liftA2 (liftA2 f) (g1 c) (g2 c))))))
+
+  (define-instance (Alternative Guard)
+    (define empty (%Guard (fn (_) None)))
+    (define (alt (%Guard g1) (%Guard g2))
+      (%Guard (fn (c)
+                (let ((x1 (g1 c)))
+                  (match x1
+                    ((Some _) x1)
+                    ((None)
+                     (let ((x2 (g2 c)))
+                       (match x2
+                         ((Some _) x2)
+                         ((None) None))))))))))
+
+  (define-instance (Into (Guard :a) (Parser :a))
+    (define (into (%Guard g))
+      (do (c <- peek-char)
+          (match (g c)
+            ((Some p) p)
+            ((None) (fail (<> "Unexpected char: " (into (make-list c)))))))))
 
   (declare peek-char-or-eof (Parser (Optional Char)))
   (define peek-char-or-eof

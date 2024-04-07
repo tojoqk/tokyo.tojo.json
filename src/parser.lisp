@@ -27,32 +27,8 @@
     (and (char:ascii-digit? c)
          (not (== c #\0))))
 
-  (define-type JSON-Value-Type
-    (JString)
-    (JNumber)
-    (JObject)
-    (JArray)
-    (JTrue)
-    (JFalse)
-    (JNull))
-
   (define (message-with msg c)
     (<> msg (<> ": " (into c))))
-
-  (declare json-type-parser (Unit -> parser:Parser JSON-Value-Type))
-  (define (json-type-parser)
-    (>>= parser:peek-char
-         (fn (c)
-           (cond
-             ((== c #\-) (pure JNumber))
-             ((digit? c) (pure JNumber))
-             ((== c #\") (pure JString))
-             ((== c #\[) (pure JArray))
-             ((== c #\t) (pure JTrue))
-             ((== c #\f) (pure JFalse))
-             ((== c #\n) (pure JNull))
-             ((== c #\{) (pure JObject))
-             (True (fail  "unexpected char: " ))))))
 
   (define (whitespace? c)
     (or (== c #\return)
@@ -60,7 +36,9 @@
         (== c #\newline)
         (== c #\space)))
 
-  (define (whitespace-parser)
+  (define whitespace-parser (parser:delay (whitespace-parser_)))
+
+  (define (whitespace-parser_)
     (>>= parser:peek-char-or-eof
          (fn (opt)
            (match opt
@@ -68,7 +46,7 @@
              ((Some c)
               (if (whitespace? c)
                   (>> parser:read-char
-                      (whitespace-parser))
+                      (whitespace-parser_))
                   (pure Unit)))))))
 
   (declare parse-hex (String -> (Optional UFix)))
@@ -103,29 +81,28 @@
         (== c #\,)
         (== c #\")))
 
-  (declare word-parser (Unit -> (parser:Parser String)))
-  (define (word-parser) (take-until-parser sep?))
+  (declare word-parser (parser:Parser String))
+  (define word-parser (parser:delay (take-until-parser sep?)))
 
-
-  (declare null-parser (Unit -> (parser:Parser Unit)))
-  (define (null-parser)
-    (>>= (non-empty-string (word-parser))
+  (declare null-parser (parser:Parser Unit))
+  (define null-parser
+    (>>= (non-empty-string word-parser)
          (fn (word)
            (if (== word "null")
                (pure Unit)
                (fail (message-with "Unexpected string" word))))))
 
-  (declare true-parser (Unit -> (parser:Parser Boolean)))
-  (define (true-parser)
-    (>>= (non-empty-string (word-parser))
+  (declare true-parser (parser:Parser Boolean))
+  (define true-parser
+    (>>= (non-empty-string word-parser)
          (fn (word)
            (if (== word "true")
                (pure True)
                (fail (message-with "Unexpected empty string" word))))))
 
-  (declare false-parser (Unit -> (parser:Parser Boolean)))
-  (define (false-parser)
-    (>>= (non-empty-string (word-parser))
+  (declare false-parser (parser:Parser Boolean))
+  (define false-parser
+    (>>= (non-empty-string word-parser)
          (fn (word)
            (if (== word "false")
                (pure False)
@@ -153,8 +130,10 @@
                 (pure (make-list))
                 (list:repeat n parser:peek-char))))
 
-  (declare string-parser (Unit -> parser:Parser String))
-  (define (string-parser)
+  (define string-parser (parser:delay (string-parser_)))
+
+  (declare string-parser_ (Unit -> parser:Parser String))
+  (define (string-parser_)
     (let ((declare start-parser (Unit -> (parser:Parser (List String))))
           (start-parser
             (fn ()
@@ -197,22 +176,22 @@
            (fn (lst)
              (pure (mconcat lst))))))
 
-  (declare array-parser (Unit -> (parser:Parser (List json:JSON))))
-  (define (array-parser)
+  (declare array-parser (parser:Parser (List json:JSON)))
+  (define array-parser
     (let ((start-parser
             (fn ()
               (let ((continue-parser
                       (fn (value)
-                        (>>= (>> (whitespace-parser)
+                        (>>= (>> whitespace-parser
                                  parser:read-char)
                              (fn (c)
                                (cond
                                  ((== c #\]) (pure (make-list value)))
                                  ((== c #\,) (liftA2 Cons (pure value) (start-parser)))
                                  (True (fail (message-with "Unexpected char" (make-list c))))))))))
-                (>>= (json-parser) continue-parser)))))
+                (>>= json-parser continue-parser)))))
       (>> parser:read-char
-          (>> (whitespace-parser)
+          (>> whitespace-parser
               (>>= parser:peek-char
                    (fn (c)
                      (if (== c #\])
@@ -220,14 +199,16 @@
                              (pure Nil))
                          (start-parser))))))))
 
-  (declare object-parser (Unit -> parser:Parser (map:Map String json:JSON)))
-  (define (object-parser)
-    (let key-parser = (string-parser))
-    (let value-parser = (>> (whitespace-parser) (json-parser)))
+  (define object-parser (parser:delay (object-parser_)))
+
+  (declare object-parser_ (Unit -> parser:Parser (map:Map String json:JSON)))
+  (define (object-parser_)
+    (let key-parser = string-parser)
+    (let value-parser = (>> whitespace-parser json-parser))
     (let key-value-parser =
       (>>= key-parser
            (fn (key)
-             (>>= (>> (whitespace-parser)
+             (>>= (>> whitespace-parser
                       parser:read-char)
                   (fn (c)
                     (if (== c #\:)
@@ -239,7 +220,7 @@
             (fn ()
               (let ((continue-parser
                       (fn ((Tuple key value))
-                        (>>= (>> (whitespace-parser)
+                        (>>= (>> whitespace-parser
                                  parser:read-char)
                              (fn (c)
                                (match c
@@ -251,7 +232,7 @@
                                   (pure (map:insert-or-replace map:empty key value)))
                                  (_
                                   (fail (message-with "Unexpected char" (make-list c))))))))))
-                (>>= (>> (whitespace-parser)
+                (>>= (>> whitespace-parser
                          parser:peek-char)
                      (fn (c)
                        (match c
@@ -260,7 +241,7 @@
                          (_
                           (fail (message-with "Unexpected char" (make-list c)))))))))))
       (>>= (>> parser:read-char
-               (>> (whitespace-parser)
+               (>> whitespace-parser
                    parser:peek-char))
            (fn (c)
              (match c
@@ -319,7 +300,7 @@
         (match (parse-float head fraction exponent)
           ((None)
            (fail (message-with "Unexpected string" (mconcat
-                                            (make-list head "." fraction "e" exponent)))))
+                                                    (make-list head "." fraction "e" exponent)))))
           ((Some float)
            (pure float)))))
     (let head-parser =
@@ -392,23 +373,30 @@
                          (True
                           (fail (message-with "Unexpected char" (make-list c)))))))))))))
 
-  (declare json-parser (Unit -> (parser:Parser json:JSON)))
-  (define (json-parser)
-    (>>= (>> (whitespace-parser)
-             (json-type-parser))
-         (fn (type)
-           (match type
-             ((JNull) (>> (null-parser) (pure json:Null)))
-             ((JTrue) (>>= (true-parser) (.> into pure)))
-             ((JFalse) (>>= (false-parser) (.> into pure)))
-             ((JString) (>>= (string-parser) (.> into pure)))
-             ((JArray) (>>= (array-parser) (.> into pure)))
-             ((JObject) (>>= (object-parser) (.> into pure)))
-             ((JNumber) (>>= number-parser (.> into pure)))))))
+  (declare json-parser (parser:Parser json:JSON))
+  (define json-parser
+    (>> whitespace-parser
+        (into
+         (asum
+          (make-list
+           (parser:guard (== #\n)
+                         (>> null-parser (pure json:Null)))
+           (parser:guard (== #\t)
+                         (map into true-parser))
+           (parser:guard (== #\f)
+                         (map into false-parser))
+           (parser:guard (disjoin digit? (== #\-))
+                         (map into number-parser))
+           (parser:guard (== #\")
+                         (map into string-parser))
+           (parser:guard (== #\[)
+                         (map into array-parser))
+           (parser:guard (== #\{)
+                         (map into object-parser)))))))
 
   (declare parse! (iter:Iterator Char -> (Result parser:Error json:JSON)))
   (define (parse! iter)
-    (parser:run! (json-parser)
+    (parser:run! json-parser
                  (parser:make-stream! iter)))
 
   (declare parse (String -> (Result parser:Error json:JSON)))
