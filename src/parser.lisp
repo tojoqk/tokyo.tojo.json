@@ -110,20 +110,20 @@
             (pure False)
             (fail (message-with "Unexpected string" word)))))
 
-  (declare escape-char-map (map:Map Char String))
+  (declare escape-char-map (map:Map Char Char))
   (define escape-char-map
     (foldr (fn ((Tuple k v) acc)
              (map:insert-or-replace acc k v))
            map:empty
            (make-list
-            (Tuple #\" "\"")
-            (Tuple #\\ "\\")
-            (Tuple #\/ "/")
-            (Tuple #\b (into (make-list #\backspace)))
-            (Tuple #\f (into (make-list #\page)))
-            (Tuple #\n (into (make-list #\newline)))
-            (Tuple #\r (into (make-list #\return)))
-            (Tuple #\t (into (make-list #\tab))))))
+            (Tuple #\" #\")
+            (Tuple #\\ #\\)
+            (Tuple #\/ #\/)
+            (Tuple #\b #\backspace)
+            (Tuple #\f #\page)
+            (Tuple #\n #\newline)
+            (Tuple #\r #\return)
+            (Tuple #\t #\tab))))
 
   (define (escape-char? c)
     (optional:some? (map:lookup escape-char-map c)))
@@ -134,42 +134,38 @@
 
   (declare string-parser (parser:Parser String))
   (define string-parser
-    (let ((declare string-list-parser (Unit -> (parser:Parser (List String))))
-          (string-list-parser
-            (fn ()
-              (parser:from-guard
-               (alt* (parser:guard-char (== #\")
-                                        (>> parser:read-char
-                                            (pure (make-list))))
-                     (parser:guard-char (== #\\)
-                                        (>> parser:read-char
-                                            (string-list/escape-parser)))
-                     (parser:guard-char (const True)
-                                        (do (str <- (take-until-parser (disjoin (== #\\) (== #\"))))
-                                            (liftA2 Cons (pure str) (string-list-parser))))))))
-
-          (declare string-list/escape-parser (Unit -> (parser:Parser (List String))))
-          (string-list/escape-parser
-            (fn ()
-              (parser:from-guard
-               (alt*
-                (parser:guard-lookup escape-char-map
-                                     (fn (str)
-                                       (>> parser:read-char
-                                           (liftA2 cons (pure str) (string-list-parser)))))
-                (parser:guard-char (== #\u)
-                                   (do parser:read-char
-                                       (str <- (take-parser 4))
-                                     (match (>>= (parse-hex str) char:code-char)
-                                       ((None)
-                                        (fail (message-with "Unexpected string" str)))
-                                       ((Some c)
-                                        (liftA2 Cons
-                                                (pure (into (make-list c)))
-                                                (string-list-parser)))))))))))
-      (do parser:read-char
-          (lst <- (string-list-parser))
-        (pure (mconcat lst)))))
+    (let ((declare escaped-char-parser (parser:Parser String))
+          (escaped-char-parser
+            (parser:from-guard
+             (alt* (parser:guard-lookup escape-char-map
+                                        (fn (c)
+                                          (>> parser:read-char
+                                              (pure (into (make-list c))))))
+                   (parser:guard-char (== #\u)
+                                      (do parser:read-char
+                                          (str <- (take-parser 4))
+                                        (match (>>= (parse-hex str) char:code-char)
+                                          ((None)
+                                           (fail (message-with "Unexpected string" str)))
+                                          ((Some c)
+                                           (pure (into (make-list c))))))))))
+          (declare substring-parser (parser:Parser String))
+          (substring-parser
+            (parser:from-guard
+             (alt* (parser:guard-char (== #\\)
+                                      (>> parser:read-char
+                                          escaped-char-parser))
+                   (parser:guard-char (const True)
+                                      (take-until-parser (disjoin (== #\\) (== #\"))))))))
+      (>> parser:read-char
+          (>>= (parser:collect-while
+                (fn (c)
+                  (if (== c #\")
+                      None
+                      (Some substring-parser))))
+               (fn (lst)
+                 (>> parser:read-char
+                     (pure (mconcat lst))))))))
 
   (declare array-parser (parser:Parser (List json:JSON)))
   (define array-parser (parser:delay (array-parser_)))
