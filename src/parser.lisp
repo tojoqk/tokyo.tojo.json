@@ -167,55 +167,59 @@
                  (>> parser:read-char
                      (pure (mconcat lst))))))))
 
-  (declare array-parser (parser:Parser (List json:JSON)))
-  (define array-parser
+  (declare array-parser (UFix -> parser:Parser (List json:JSON)))
+  (define (array-parser n)
     (let ((element-list-parser
-            (do (h <- (parser:delay json-parser))
-                (t <- (parser:collect-while
-                       (fn (c)
-                         (if (== c #\,)
-                             (Some
-                              (>> parser:read-char
-                                  (>>= json-parser
-                                       (fn (v)
-                                         (>> whitespace-parser (pure v))))))
-                             None))))
-              (parser:from-guard
-               (parser:guard-char (== #\])
-                                  (>> parser:read-char
-                                      (pure (Cons h t))))))))
+            (parser:delay
+             (do (h <- (json-parser (1- n)))
+                 (t <- (parser:collect-while
+                        (fn (c)
+                          (if (== c #\,)
+                              (Some
+                               (>> parser:read-char
+                                   (>>= (json-parser (1- n))
+                                        (fn (v)
+                                          (>> whitespace-parser (pure v))))))
+                              None))))
+               (parser:from-guard
+                (parser:guard-char (== #\])
+                                   (>> parser:read-char
+                                       (pure (Cons h t)))))))))
       (>> (>> parser:read-char
               whitespace-parser)
           (parser:from-guard
            (alt* (parser:guard-char (== #\]) (pure Nil))
-                 (parser:guard-char (const True) element-list-parser))))))
+                 (parser:guard-char (const True)
+                                    element-list-parser))))))
 
-  (declare object-parser (parser:Parser (map:Map String json:JSON)))
-  (define object-parser
+  (declare object-parser (UFix -> parser:Parser (map:Map String json:JSON)))
+  (define (object-parser n)
     (let ((declare key-value-parser (parser:Parser (Tuple String json:JSON)))
           (key-value-parser
-            (do (key <- string-parser)
-                whitespace-parser
-              (parser:from-guard
-               (parser:guard-char (== #\:)
-                                  (do parser:read-char
-                                      (value <- json-parser)
-                                   whitespace-parser
-                                    (pure (Tuple key value)))))))
+            (parser:delay
+             (do (key <- string-parser)
+                 whitespace-parser
+               (parser:from-guard
+                (parser:guard-char (== #\:)
+                                   (do parser:read-char
+                                       (value <- (json-parser (1- n)))
+                                    whitespace-parser
+                                     (pure (Tuple key value))))))))
           (declare key-value-list-parser (parser:Parser (List (Tuple String json:JSON))))
           (key-value-list-parser
-            (do (h <- key-value-parser)
-                (t <- (parser:collect-while
-                       (fn (c)
-                         (if (== c #\,)
-                             (Some (do parser:read-char
-                                       whitespace-parser
-                                    key-value-parser))
-                             None))))
-              (parser:from-guard
-               (parser:guard-char (== #\})
-                                  (>> parser:read-char
-                                      (pure (Cons h t))))))))
+            (parser:delay
+             (do (h <- key-value-parser)
+                 (t <- (parser:collect-while
+                        (fn (c)
+                          (if (== c #\,)
+                              (Some (do parser:read-char
+                                        whitespace-parser
+                                     key-value-parser))
+                              None))))
+               (parser:from-guard
+                (parser:guard-char (== #\})
+                                   (>> parser:read-char
+                                       (pure (Cons h t)))))))))
       (do parser:read-char
           whitespace-parser
         (parser:from-guard
@@ -340,29 +344,31 @@
                (parser:guard-char sep?
                                   (parser:delay (integer-parser head)))))))))
 
-  (declare json-parser (parser:Parser json:JSON))
-  (define json-parser
-    (>> whitespace-parser
-        (parser:from-guard
-         (alt*
-          (parser:guard-char (== #\n)
-                             (>> null-parser (pure json:Null)))
-          (parser:guard-char (== #\t)
-                             (map into true-parser))
-          (parser:guard-char (== #\f)
-                             (map into false-parser))
-          (parser:guard-char (disjoin digit? (== #\-))
-                             (map into number-parser))
-          (parser:guard-char (== #\")
-                             (map into string-parser))
-          (parser:guard-char (== #\[)
-                             (map into array-parser))
-          (parser:guard-char (== #\{)
-                             (map into object-parser))))))
+  (declare json-parser (Ufix -> parser:Parser json:JSON))
+  (define (json-parser n)
+    (if (== n 0)
+        (fail "Nesting depth exceeded")
+        (>> whitespace-parser
+            (parser:from-guard
+             (alt*
+              (parser:guard-char (== #\n)
+                                 (>> null-parser (pure json:Null)))
+              (parser:guard-char (== #\t)
+                                 (map into true-parser))
+              (parser:guard-char (== #\f)
+                                 (map into false-parser))
+              (parser:guard-char (disjoin digit? (== #\-))
+                                 (map into number-parser))
+              (parser:guard-char (== #\")
+                                 (map into string-parser))
+              (parser:guard-char (== #\[)
+                                 (map into (parser:delay (array-parser n))))
+              (parser:guard-char (== #\{)
+                                 (map into (parser:delay (object-parser n)))))))))
 
   (declare parse! (iter:Iterator Char -> (Result parser:Error json:JSON)))
   (define (parse! iter)
-    (parser:run! json-parser
+    (parser:run! (json-parser 1024)
                  (parser:make-stream! iter)))
 
   (declare parse (String -> (Result parser:Error json:JSON)))
