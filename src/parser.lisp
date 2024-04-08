@@ -190,48 +190,39 @@
            (alt* (parser:guard-char (== #\]) (pure Nil))
                  (parser:guard-char (const True) element-list-parser))))))
 
-  (define object-parser (parser:delay (object-parser_)))
-
-  (define (object-parser_)
-    (let ((declare key-parser (parser:Parser String))
-          (key-parser string-parser)
-
-          (declare value-parser (parser:Parser json:JSON))
-          (value-parser (>> whitespace-parser json-parser))
-
-          (declare key-value-parser (parser:Parser (Tuple String json:JSON)))
+  (declare object-parser (parser:Parser (map:Map String json:JSON)))
+  (define object-parser
+    (let ((declare key-value-parser (parser:Parser (Tuple String json:JSON)))
           (key-value-parser
-            (do (key <- key-parser)
+            (do (key <- string-parser)
                 whitespace-parser
               (parser:from-guard
                (parser:guard-char (== #\:)
                                   (do parser:read-char
-                                      (value <- value-parser)
+                                      (value <- json-parser)
+                                   whitespace-parser
                                     (pure (Tuple key value)))))))
-
-          (declare map-parser (Unit -> parser:Parser (map:Map String json:JSON)))
-          (map-parser
-            (fn ()
-              (do whitespace-parser
-                  (parser:from-guard
-                   ((parser:guard-char (== #\"))
-                    (do ((Tuple key value) <- key-value-parser)
-                        whitespace-parser
-                      (parser:from-guard
-                       (alt* (parser:guard-char (== #\,)
-                                                (do parser:read-char
-                                                    (map <- (map-parser))
-                                                  (pure (map:insert-or-replace map key value))))
-                             (parser:guard-char (== #\})
-                                                (do parser:read-char
-                                                    (pure (map:insert-or-replace map:empty key value)))))))))))))
+          (declare key-value-list-parser (parser:Parser (List (Tuple String json:JSON))))
+          (key-value-list-parser
+            (do (h <- key-value-parser)
+                (t <- (parser:collect-while
+                       (fn (c)
+                         (if (== c #\,)
+                             (Some (do parser:read-char
+                                       whitespace-parser
+                                    key-value-parser))
+                             None))))
+              (parser:from-guard
+               (parser:guard-char (== #\})
+                                  (>> parser:read-char
+                                      (pure (Cons h t))))))))
       (do parser:read-char
           whitespace-parser
         (parser:from-guard
-         (alt* (parser:guard-char (== #\})
-                                  (>> parser:read-char (pure map:empty)))
+         (alt* (parser:guard-char (== #\}) (pure map:empty))
                (parser:guard-char (const True)
-                                  (parser:delay (map-parser))))))))
+                                  (map (.< map:collect! iter:into-iter)
+                                       key-value-list-parser)))))))
 
   (declare digits-parser (parser:Parser String))
   (define digits-parser
