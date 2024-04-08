@@ -2,8 +2,7 @@
   (:use #:coalton-testing)
   (:local-nicknames
    (#:map #:coalton-library/ord-map)
-   (#:json #:tokyo.tojo.json/json)
-   (#:parser #:tokyo.tojo.json/parser))
+   (#:json #:tokyo.tojo.json/json))
   (:export #:run-tests))
 
 (in-package #:tokyo.tojo.json/test)
@@ -21,55 +20,55 @@
 
 (define-test parse-symbol-test ()
   (matches (Ok json:Null)
-      (parser:parse "null"))
+      (json:parse "null"))
   (matches (Ok json:True)
-      (parser:parse "true"))
+      (json:parse "true"))
   (matches (Ok json:False)
-      (parser:parse "false"))
+      (json:parse "false"))
   (matches (Err _)
-      (parser:parse "nil")))
+      (json:parse "nil")))
 
 (define-test parse-number-test ()
   (matches (Ok (json:Number 42.0d0))
-      (parser:parse "42"))
+      (json:parse "42"))
   (matches (Ok (json:Number 42.0d0))
-      (parser:parse "  42.0  "))
+      (json:parse "  42.0  "))
   (matches (Ok (json:Number 42.0d0))
-      (parser:parse "   42e0"))
+      (json:parse "   42e0"))
   (matches (Ok (json:Number 420d0))
-      (parser:parse "42e001"))
+      (json:parse "42e001"))
   (matches (Ok (json:Number 4200d0))
-      (parser:parse "42e2"))
+      (json:parse "42e2"))
   (matches (Ok (json:Number 123456789d0))
-      (parser:parse "123456789"))
+      (json:parse "123456789"))
   (matches (Ok (json:Number 4200d0))
-      (parser:parse "42e+2"))
+      (json:parse "42e+2"))
   (matches (Ok (json:Number 0.42d0))
-      (parser:parse "42e-2"))
+      (json:parse "42e-2"))
   (matches (Err _)
-      (parser:parse "0123"))
+      (json:parse "0123"))
   (matches (Err _)
-      (parser:parse "133."))
+      (json:parse "133."))
   (matches (Err _)
-      (parser:parse "133a")))
+      (json:parse "133a")))
 
 (define-test parse-string-test ()
   (matches (Ok (json:String "hello"))
-      (parser:parse "\"hello\"")))
+      (json:parse "\"hello\"")))
 
 (define-test parse-array-test ()
   (is (pipe "[\"hello\", 3, true, false  ]"
-            parser:parse
+            json:parse
             (== (Ok (json:Array
                      (make-list (json:String "hello")
                                 (json:Number 3d0)
                                 json:True
                                 json:False))))))
   (matches (Err _)
-      (parser:parse "[133, ]"))
+      (json:parse "[133, ]"))
   (matches (Err _)
-      (parser:parse "[133, , 3]"))
-  (is (pipe (parser:parse "[133, [1, 2, 3], 3]")
+      (json:parse "[133, , 3]"))
+  (is (pipe (json:parse "[133, [1, 2, 3], 3]")
             (== (Ok (json:Array
                      (make-list (json:Number 133d0)
                                 (json:Array
@@ -88,13 +87,13 @@
 
 (define-test parse-object-test ()
   (is (pipe "{\"hello\" : \"world\" }"
-            parser:parse
+            json:parse
             (== (Ok (make-object
                      (make-list (Tuple "hello" (json:String "world"))))))))
   (is (pipe "
 {\"test\" : 42, \"object\": { \"true\": true, \"false\" : false },
  \"array\": [10, 3.2, \"test\"], \"null\" : null }"
-            parser:parse
+            json:parse
             (== (Ok (make-object
                      (make-list (Tuple "test" (json:Number 42d0))
                                 (Tuple "object"
@@ -108,8 +107,8 @@
                                                    (json:String "test"))))
                                 (Tuple "null" json:Null)))))))
   (matches (Ok (json:Object map:empty))
-      (parser:parse "{}"))
+      (json:parse "{}"))
   (matches (Err _)
-      (parser:parse "{,}"))
+      (json:parse "{,}"))
   (matches (Err _)
-      (parser:parse "{\"test\" : 42,}")))
+      (json:parse "{\"test\" : 42,}")))

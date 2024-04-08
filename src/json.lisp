@@ -8,7 +8,11 @@
    (#:map #:coalton-library/ord-map)
    (#:iter #:coalton-library/iterator)
    (#:char #:coalton-library/char)
-   (#:output #:tokyo.tojo.json/private/output-stream))
+   (#:str #:coalton-library/string)
+   (#:optional #:coalton-library/optional)
+   (#:list #:coalton-library/list)
+   (#:output #:tokyo.tojo.json/private/output-stream)
+   (#:parser #:tokyo.tojo.json/private/parser))
   (:export #:JSON
            #:Null
            #:True
@@ -16,7 +20,10 @@
            #:Number
            #:String
            #:Array
-           #:Object))
+           #:Object
+
+           #:parse
+           #:parse!))
 
 (in-package #:tokyo.tojo.json/json)
 

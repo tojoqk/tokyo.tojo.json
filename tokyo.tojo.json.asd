@@ -9,7 +9,7 @@
   :components ((:file "private/output-stream")
                (:file "private/parser")
                (:file "json")
-               (:file "parser"))
+               (:file "json/parser"))
   :in-order-to ((test-op (test-op "tokyo.tojo.json/test"))))
 
 (defsystem #:tokyo.tojo.json/test
