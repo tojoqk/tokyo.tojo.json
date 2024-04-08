@@ -99,9 +99,9 @@
   (declare true-parser (parser:Parser Boolean))
   (define true-parser
     (do (word <- (non-empty-string word-parser))
-         (if (== word "true")
-             (pure True)
-             (fail (message-with "Unexpected empty string" word)))))
+        (if (== word "true")
+            (pure True)
+            (fail (message-with "Unexpected empty string" word)))))
 
   (declare false-parser (parser:Parser Boolean))
   (define false-parser
