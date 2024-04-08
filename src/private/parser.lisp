@@ -26,7 +26,8 @@
            #:UnexpectedEof
            #:make-stream!
            #:delay
-           #:run!))
+           #:run!
+           #:collect-while))
 
 (in-package #:tokyo.tojo.json/private/parser)
 
@@ -236,4 +237,29 @@
   (define (run! (Parser parse!) in)
     (>>= (parse! in)
          (fn ((Tuple x _))
-           (pure x)))))
+           (pure x))))
+
+  (declare collect-while ((Char -> Optional (Parser :a)) -> Parser (List :a)))
+  (define (collect-while f)
+    (Parser
+     (fn (in)
+       (let result = (cell:new Nil))
+       (let in* = (cell:new in))
+       (loop
+         (match (peek (cell:read in*))
+           ((Some c)
+            (match (f c)
+              ((None) (break))
+              ((Some (Parser parse!))
+               (match (parse! (cell:read in*))
+                 ((Ok (Tuple elem in_))
+                  (cell:write! in* in_)
+                  (cell:write! result
+                               (cons elem (cell:read result)))
+                  Unit)
+                 ((Err e)
+                  (return (Err e)))))))
+           ((None)
+            (return (Err UnexpectedEof)))))
+       (pure (Tuple (reverse (cell:read result))
+                    (cell:read in*)))))))
