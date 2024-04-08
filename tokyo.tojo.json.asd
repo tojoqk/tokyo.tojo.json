@@ -6,7 +6,8 @@
   :depends-on (#:coalton)
   :serial t
   :pathname "src/"
-  :components ((:file "private/parser")
+  :components ((:file "private/output-stream")
+               (:file "private/parser")
                (:file "json")
                (:file "parser"))
   :in-order-to ((test-op (test-op "tokyo.tojo.json/test"))))
