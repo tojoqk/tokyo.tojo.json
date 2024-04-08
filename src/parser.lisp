@@ -168,30 +168,27 @@
                      (pure (mconcat lst))))))))
 
   (declare array-parser (parser:Parser (List json:JSON)))
-  (define array-parser (parser:delay (array-parser_)))
-
-  (declare array-parser_ (Unit -> (parser:Parser (List json:JSON))))
-  (define (array-parser_)
-    (let ((declare elements-parser (Unit -> (parser:Parser (List json:JSON))))
-          (elements-parser
-            (fn ()
-              (do (value <- json-parser)
-                  whitespace-parser
-                (parser:from-guard
-                 (alt* (parser:guard-char (== #\])
-                                          (>> parser:read-char
-                                              (pure (make-list value))))
-                       (parser:guard-char (== #\,)
-                                          (>> parser:read-char
-                                              (liftA2 Cons (pure value) (elements-parser))))))))))
-      (do parser:read-char
-          whitespace-parser
-        (parser:from-guard
-         (alt* (parser:guard-char (== #\])
+  (define array-parser
+    (let ((element-list-parser
+            (do (h <- (parser:delay json-parser))
+                (t <- (parser:collect-while
+                       (fn (c)
+                         (if (== c #\,)
+                             (Some
+                              (>> parser:read-char
+                                  (>>= json-parser
+                                       (fn (v)
+                                         (>> whitespace-parser (pure v))))))
+                             None))))
+              (parser:from-guard
+               (parser:guard-char (== #\])
                                   (>> parser:read-char
-                                      (pure Nil)))
-               (parser:guard-char (const True)
-                                  (parser:delay (elements-parser))))))))
+                                      (pure (Cons h t))))))))
+      (>> (>> parser:read-char
+              whitespace-parser)
+          (parser:from-guard
+           (alt* (parser:guard-char (== #\]) (pure Nil))
+                 (parser:guard-char (const True) element-list-parser))))))
 
   (define object-parser (parser:delay (object-parser_)))
 
