@@ -350,11 +350,15 @@
               (parser:guard-char (== #\{)
                                  (map into (parser:delay (object-parser n)))))))))
 
-  (declare parse! (iter:Iterator Char -> (Result parser:Error JSON)))
+  (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
   (define (parse! iter)
-    (parser:run! (json-parser 1024)
-                 (parser:make-stream! iter)))
+    (result:map-err (fn (e)
+                      (match e
+                        ((parser:UnexpectedEof) "Unexpected eof")
+                        ((parser:Message s) s)))
+                    (parser:run! (json-parser 1024)
+                                 (parser:make-stream! iter))))
 
-  (declare parse (coalton:String -> (Result parser:Error JSON)))
+  (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)
     (parse! (iter:into-iter str))))

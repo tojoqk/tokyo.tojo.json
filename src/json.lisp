@@ -11,6 +11,7 @@
    (#:str #:coalton-library/string)
    (#:optional #:coalton-library/optional)
    (#:list #:coalton-library/list)
+   (#:result #:coalton-library/result)
    (#:output #:tokyo.tojo.json/private/output-stream)
    (#:parser #:tokyo.tojo.json/private/parser))
   (:export #:JSON
