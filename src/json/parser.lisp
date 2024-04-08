@@ -361,4 +361,7 @@
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)
-    (parse! (iter:into-iter str))))
+    (parse! (iter:into-iter str)))
+
+  (define-instance (TryInto coalton:String JSON)
+    (define tryInto parse)))
