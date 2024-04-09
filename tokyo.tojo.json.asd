@@ -25,4 +25,5 @@
   :serial t
   :pathname "test/"
   :components ((:file "package")
-               (:file "parser")))
+               (:file "parser")
+               (:file "renderer")))
