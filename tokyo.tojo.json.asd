@@ -24,4 +24,5 @@
                     (symbol-call '#:tokyo.tojo.json/test '#:run-tests))
   :serial t
   :pathname "test/"
-  :components ((:file "parser")))
+  :components ((:file "package")
+               (:file "parser")))
