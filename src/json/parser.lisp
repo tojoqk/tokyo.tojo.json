@@ -28,15 +28,14 @@
         (== c #\newline)
         (== c #\space)))
 
-  (define whitespace-parser (parser:delay (whitespace-parser_)))
-
-  (define (whitespace-parser_)
-    (parser:from-guard
-     (alt*
-      (parser:guard-char whitespace?
-                         (>> parser:read-char
-                             (parser:delay (whitespace-parser_))))
-      (parser:guard-else (pure Unit)))))
+  (declare whitespace-parser (parser:Parser Unit))
+  (define whitespace-parser
+    (>> (parser:collect-while
+         (fn (c)
+           (if (whitespace? c)
+               (Some parser:read-char )
+               None)))
+        (pure Unit)))
 
   (declare parse-hex (coalton:String -> (Optional UFix)))
   (define (parse-hex str)
