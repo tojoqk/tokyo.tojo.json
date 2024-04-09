@@ -27,7 +27,6 @@ If you are using Quicklisp, you can load the system with the following.
   (:use #:coalton
         #:coalton-prelude)
   (:local-nicknames
-   (#:parser #:tokyo.tojo.json/parser)
    (#:json #:tokyo.tojo.json/json)
    (#:map #:coalton-library/ord-map)))
 
@@ -56,7 +55,7 @@ If you are using Quicklisp, you can load the system with the following.
 
   (declare eval (String -> (Optional Double-Float)))
   (define (eval str)
-    (do (json <- (as-optional (parser:parse str)))
+    (do (json <- (as-optional (json:parse str)))
         (obj <- (get-object json))
       (left <- (>>= (map:lookup obj "left")
                     get-number))
