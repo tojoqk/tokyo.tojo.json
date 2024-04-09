@@ -71,7 +71,4 @@
         ((Tuple (String x) (String y)) (== x y))
         ((Tuple (Array x) (Array y)) (== x y))
         ((Tuple (Object x) (Object y)) (== x y))
-        (_ coalton:False))))
-
-  (define-instance (Into JSON coalton:String)
-    (define (into x) (render x))))
+        (_ coalton:False)))))
