@@ -32,7 +32,7 @@
           (render_ h out)
           (for x in t
                (output:write-char #\, out)
-               (render_ h out)))
+               (render_ x out)))
          ((Nil) Unit))
        (output:write-char #\] out))
       ((Object m)
