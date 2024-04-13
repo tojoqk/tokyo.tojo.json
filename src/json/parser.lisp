@@ -150,67 +150,6 @@
                  (>> parser:read-char
                      (pure (mconcat lst))))))))
 
-  (declare array-parser (UFix -> parser:Parser (List JSON)))
-  (define (array-parser n)
-    (let ((element-list-parser
-            (parser:delay
-             (do (h <- (json-parser (1- n)))
-                 (t <- (parser:collect-while
-                        (fn (c)
-                          (if (== c #\,)
-                              (Some
-                               (>> parser:read-char
-                                   (>>= (json-parser (1- n))
-                                        (fn (v)
-                                          (>> whitespace-parser (pure v))))))
-                              None))))
-               (parser:from-guard
-                (parser:guard-char (== #\])
-                                   (>> parser:read-char
-                                       (pure (Cons h t)))))))))
-      (>> (>> parser:read-char
-              whitespace-parser)
-          (parser:from-guard
-           (alt* (parser:guard-char (== #\]) (pure Nil))
-                 (parser:guard-char (const coalton:True)
-                                    element-list-parser))))))
-
-  (declare object-parser (UFix -> parser:Parser (map:Map coalton:String JSON)))
-  (define (object-parser n)
-    (let ((declare key-value-parser (parser:Parser (Tuple coalton:String JSON)))
-          (key-value-parser
-            (parser:delay
-             (do (key <- string-parser)
-                 whitespace-parser
-               (parser:from-guard
-                (parser:guard-char (== #\:)
-                                   (do parser:read-char
-                                       (value <- (json-parser (1- n)))
-                                    whitespace-parser
-                                     (pure (Tuple key value))))))))
-          (declare key-value-list-parser (parser:Parser (List (Tuple coalton:String JSON))))
-          (key-value-list-parser
-            (parser:delay
-             (do (h <- key-value-parser)
-                 (t <- (parser:collect-while
-                        (fn (c)
-                          (if (== c #\,)
-                              (Some (do parser:read-char
-                                        whitespace-parser
-                                     key-value-parser))
-                              None))))
-               (parser:from-guard
-                (parser:guard-char (== #\})
-                                   (>> parser:read-char
-                                       (pure (Cons h t)))))))))
-      (do parser:read-char
-          whitespace-parser
-        (parser:from-guard
-         (alt* (parser:guard-char (== #\}) (pure map:empty))
-               (parser:guard-char (const coalton:True)
-                                  (map (.< map:collect! iter:into-iter)
-                                       key-value-list-parser)))))))
-
   (declare digits-parser (parser:Parser coalton:String))
   (define digits-parser
     (let length>0-check =
@@ -327,27 +266,193 @@
                (parser:guard-char sep?
                                   (parser:delay (integer-parser head)))))))))
 
-  (declare json-parser (Ufix -> parser:Parser JSON))
-  (define (json-parser n)
-    (if (== n 0)
-        (fail "Nesting depth exceeded")
-        (>> whitespace-parser
-            (parser:from-guard
-             (alt*
-              (parser:guard-char (== #\n)
-                                 (>> null-parser (pure Null)))
-              (parser:guard-char (== #\t)
-                                 (map into true-parser))
-              (parser:guard-char (== #\f)
-                                 (map into false-parser))
-              (parser:guard-char (disjoin digit? (== #\-))
-                                 (map into number-parser))
-              (parser:guard-char (== #\")
-                                 (map into string-parser))
-              (parser:guard-char (== #\[)
-                                 (map into (parser:delay (array-parser n))))
-              (parser:guard-char (== #\{)
-                                 (map into (parser:delay (object-parser n)))))))))
+  (define-type State
+    Start-Parse-Array
+    Continue-Parse-Array
+    Start-Parse-Object
+    Continue-Parse-Object)
+
+  (define (atom? x)
+    (match x
+      ((Null) coalton:True)
+      ((True) coalton:True)
+      ((False) coalton:True)
+      ((String _) coalton:True)
+      ((Number _) coalton:True)
+      ((Array _) coalton:True)
+      ((Object _) coalton:True)))
+
+  (declare zipper-parser (parser:Parser Zipper))
+  (define zipper-parser
+    (let ((parse-atom
+            (fn (parser)
+              (the (parser:Parser JSON) (map into parser))))
+          (parse-json
+            (do whitespace-parser
+                (c <- parser:peek-char)
+                (cond
+                  ((== c #\n) (parse-atom null-parser))
+                  ((== c #\t) (parse-atom true-parser))
+                  ((== c #\f) (parse-atom false-parser))
+                  ((or (digit? c) (== c #\-)) (parse-atom number-parser))
+                  ((== c #\") (parse-atom string-parser))
+                  ((== c #\[)
+                   (do parser:read-char
+                       (pure (into (Array Nil)))))
+                  ((== c #\{)
+                   (do parser:read-char
+                       (pure (into (Object map:empty)))))
+                  (coalton:True
+                   (fail (message-with "Unexpected Char" (singleton c)))))))
+          (declare key-value-parser (parser:Parser (Tuple coalton:String JSON)))
+          (key-value-parser
+            (parser:delay
+             (do (key <- string-parser)
+                 whitespace-parser
+                 (parser:from-guard
+                  (parser:guard-char (== #\:)
+                                     (do parser:read-char
+                                         (value <- parse-json)
+                                         whitespace-parser
+                                         (pure (Tuple key value))))))))
+          (declare parse (State -> Zipper -> parser:Parser (Tuple (Optional State) Zipper)))
+          (parse
+            (fn (op z)
+              (match op
+                ((Start-Parse-Array)
+                 (do whitespace-parser
+                     (ch <- parser:peek-char)
+                     (cond
+                       ((== ch #\])
+                        (do parser:read-char
+                            (match z
+                              ((Zipper _ (CrumbTop))
+                               (pure (Tuple None z)))
+                              ((Zipper _ (CrumbArray _ _ _))
+                               (pure (Tuple (Some Continue-Parse-Array) z)))
+                              ((Zipper _ (CrumbObject _ _ _ _))
+                               (pure (Tuple (Some Continue-Parse-Object) z))))))
+                       (coalton:True
+                        (do (let (Zipper _ cr) = z)
+                            (j <- parse-json)
+                            (let ((new-zipper (Zipper j (CrumbArray cr Nil Nil)))
+                                  (continue (pure (Tuple (Some Continue-Parse-Array) new-zipper))))
+                              (match j
+                                ((Null) continue)
+                                ((True) continue)
+                                ((False) continue)
+                                ((Number _) continue)
+                                ((String _) continue)
+                                ((Array _) (pure (Tuple (Some Start-Parse-Array) new-zipper)))
+                                ((Object _) (pure (Tuple (Some Start-Parse-Object) new-zipper))))))))))
+                ((Continue-Parse-Array)
+                 (match z
+                   ((Zipper x (CrumbArray cr l r))
+                    (do whitespace-parser
+                        (ch <- parser:peek-char)
+                        (cond
+                          ((== ch #\])
+                           (do parser:read-char
+                               (let ((new-zipper (Zipper (Array (append (reverse l) (Cons x r)))
+                                                         cr)))
+                                 (match cr
+                                   ((CrumbTop) (pure (Tuple None new-zipper)))
+                                   ((CrumbArray _ _ _) (pure (Tuple (Some Continue-Parse-Array) new-zipper)))
+                                   ((CrumbObject _ _ _ _) (pure (Tuple (Some Continue-Parse-Object) new-zipper)))))))
+                          ((== ch #\,)
+                           (do parser:read-char
+                               (j <- parse-json)
+                               (let ((new-zipper (Zipper j (CrumbArray cr (Cons x l) r)))
+                                     (continue (pure (Tuple (Some Continue-Parse-Array) new-zipper))))
+                                 (match j
+                                   ((Null) continue)
+                                   ((True) continue)
+                                   ((False) continue)
+                                   ((Number _) continue)
+                                   ((String _) continue)
+                                   ((Array _) (pure (Tuple (Some Start-Parse-Array) new-zipper)))
+                                   ((Object _) (pure (Tuple (Some Start-Parse-Object) new-zipper)))))))
+                          (coalton:True
+                           (fail (message-with "Unexpected char" (singleton ch)))))))
+                   (_ (coalton-prelude:error "zipper-parser: program error (Continue-Parse-Array)"))))
+                ((Start-Parse-Object)
+                 (do whitespace-parser
+                     (ch <- parser:peek-char)
+                     (cond
+                       ((== ch #\})
+                        (do parser:read-char
+                            (match z
+                              ((Zipper _ (CrumbTop))
+                               (pure (Tuple None z)))
+                              ((Zipper _ (CrumbArray _ _ _))
+                               (pure (Tuple (Some Continue-Parse-Array) z)))
+                              ((Zipper _ (CrumbObject _ _ _ _))
+                               (pure (Tuple (Some Continue-Parse-Object) z))))))
+                       (coalton:True
+                        (do (let (Zipper _ cr) = z)
+                            ((Tuple key j) <- key-value-parser)
+                            (let ((new-zipper (Zipper j (CrumbObject cr key Nil Nil)))
+                                  (continue (pure (Tuple (Some Continue-Parse-Object) new-zipper))))
+                              (match j
+                                ((Null) continue)
+                                ((True) continue)
+                                ((False) continue)
+                                ((Number _) continue)
+                                ((String _) continue)
+                                ((Array _) (pure (Tuple (Some Start-Parse-Array) new-zipper)))
+                                ((Object _) (pure (Tuple (Some Start-Parse-Object) new-zipper))))))))))
+                ((Continue-Parse-Object)
+                 (match z
+                   ((Zipper x (CrumbObject cr xk l r))
+                    (do whitespace-parser
+                        (ch <- parser:peek-char)
+                        (cond
+                          ((== ch #\})
+                           (do parser:read-char
+                               (let ((new-zipper (Zipper (Object
+                                                          (map:collect!
+                                                           (iter:into-iter (append (reverse l) (Cons (Tuple xk x) r)))))
+                                                         cr)))
+                                 (match cr
+                                   ((CrumbTop) (pure (Tuple None new-zipper)))
+                                   ((CrumbArray _ _ _) (pure (Tuple (Some Continue-Parse-Array) new-zipper)))
+                                   ((CrumbObject _ _ _ _) (pure (Tuple (Some Continue-Parse-Object) new-zipper)))))))
+                          ((== ch #\,)
+                           (do parser:read-char
+                               whitespace-parser
+                               ((Tuple key j) <- key-value-parser)
+                               (let ((new-zipper (Zipper j (CrumbObject cr key (Cons (Tuple xk x) l) r)))
+                                     (continue (pure (Tuple (Some Continue-Parse-Object) new-zipper))))
+                                 (match j
+                                   ((Null) continue)
+                                   ((True) continue)
+                                   ((False) continue)
+                                   ((Number _) continue)
+                                   ((String _) continue)
+                                   ((Array _) (pure (Tuple (Some Start-Parse-Array) new-zipper)))
+                                   ((Object _) (pure (Tuple (Some Start-Parse-Object) new-zipper)))))))
+                          (coalton:True
+                           (fail (message-with "Unexpected char" (singleton ch)))))))
+                   (_ (coalton-prelude:error "zipper-parser: program error (Continue-Parse-Object)"))))))))
+      (do (j <- parse-json)
+          (match j
+            ((Null) (pure (into j)))
+            ((True) (pure (into j)))
+            ((False) (pure (into j)))
+            ((Number _) (pure (into j)))
+            ((String _) (pure (into j)))
+            ((Array _)
+             (parser:fold-while parse
+                                Start-Parse-Array
+                                (into j)))
+            ((Object _)
+             (parser:fold-while parse
+                                Start-Parse-Object
+                                (into j)))))))
+
+  (declare json-parser (parser:Parser JSON))
+  (define json-parser
+    (map into zipper-parser))
 
   (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
   (define (parse! iter)
@@ -355,7 +460,7 @@
                       (match e
                         ((parser:UnexpectedEof) "Unexpected eof")
                         ((parser:Message s) s)))
-                    (parser:run! (json-parser 1024)
+                    (parser:run! json-parser
                                  (parser:make-stream! iter))))
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
