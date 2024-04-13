@@ -11,6 +11,9 @@
     (Array (List JSON))
     (Object (map:Map coalton:String JSON)))
 
+  (define-instance (Into Unit JSON)
+    (define (into _) Null))
+
   (define-instance (Into Boolean JSON)
     (define (into b)
       (match b
