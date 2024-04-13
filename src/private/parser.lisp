@@ -25,7 +25,6 @@
            #:delay
            #:run!
            #:collect-while
-           #:do-while
 
            #:Port
            #:make-port!))
@@ -264,24 +263,5 @@
           ((None)
            (return (Err "Unexpected eof")))))
        (pure (Tuple3 (reverse (cell:read result))
-                     (cell:read port*)
-                     (cell:read stack*))))))
-
-  (declare do-while ((Parser :s Boolean) -> (Parser :s Unit)))
-  (define (do-while (Parser parse!))
-    (Parser
-     (fn ((Tuple port stack))
-       (let port* = (cell:new port))
-       (let stack* = (cell:new stack))
-       (loop
-        (match (parse! (Tuple (cell:read port*) (cell:read stack*)))
-          ((Ok (Tuple3 b port stack))
-           (cell:write! port* port)
-           (cell:write! stack* stack)
-           (match b
-             ((True) Unit)
-             ((False) (break))))
-          ((Err e) (return (Err e)))))
-       (pure (Tuple3 Unit
                      (cell:read port*)
                      (cell:read stack*)))))))
