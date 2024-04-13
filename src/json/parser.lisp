@@ -28,7 +28,7 @@
         (== c #\newline)
         (== c #\space)))
 
-  (declare whitespace-parser (parser:Parser :s Unit))
+  (declare whitespace-parser (parser:Parser Unit))
   (define whitespace-parser
     (>> (parser:collect-while
          (fn (c)
@@ -56,7 +56,7 @@
                (pure str)
                (fail "Unexpected empty string")))))
 
-  (declare take-until-parser ((Char -> Boolean) -> (parser:Parser :s coalton:String)))
+  (declare take-until-parser ((Char -> Boolean) -> (parser:Parser coalton:String)))
   (define (take-until-parser end?)
     (parser:take-until-string end?))
 
@@ -69,24 +69,24 @@
         (== c #\,)
         (== c #\")))
 
-  (declare word-parser (parser:Parser :s coalton:String))
+  (declare word-parser (parser:Parser coalton:String))
   (define word-parser (parser:delay (take-until-parser sep?)))
 
-  (declare null-parser (parser:Parser :s Unit))
+  (declare null-parser (parser:Parser Unit))
   (define null-parser
     (do (word <- (non-empty-string word-parser))
         (if (== word "null")
             (pure Unit)
             (fail (message-with "Unexpected string" word)))))
 
-  (declare true-parser (parser:Parser :s Boolean))
+  (declare true-parser (parser:Parser Boolean))
   (define true-parser
     (do (word <- (non-empty-string word-parser))
         (if (== word "true")
             (pure coalton:True)
             (fail (message-with "Unexpected empty string" word)))))
 
-  (declare false-parser (parser:Parser :s Boolean))
+  (declare false-parser (parser:Parser Boolean))
   (define false-parser
     (do (word <- (non-empty-string word-parser))
         (if (== word "false")
@@ -111,13 +111,13 @@
   (define (escape-char? c)
     (optional:some? (map:lookup escape-char-map c)))
 
-  (declare take-parser (UFix -> (parser:Parser :s coalton:String)))
+  (declare take-parser (UFix -> (parser:Parser coalton:String)))
   (define (take-parser n)
     (map into (sequence (list:repeat n parser:peek-char))))
 
-  (declare string-parser (parser:Parser :s coalton:String))
+  (declare string-parser (parser:Parser coalton:String))
   (define string-parser
-    (let ((declare escaped-char-parser (parser:Parser :s coalton:String))
+    (let ((declare escaped-char-parser (parser:Parser coalton:String))
           (escaped-char-parser
             (parser:from-guard
              (alt* (parser:guard-lookup escape-char-map
@@ -132,7 +132,7 @@
                                            (fail (message-with "Unexpected string" str)))
                                           ((Some c)
                                            (pure (into (make-list c))))))))))
-          (declare substring-parser (parser:Parser :s coalton:String))
+          (declare substring-parser (parser:Parser coalton:String))
           (substring-parser
             (parser:from-guard
              (alt* (parser:guard-char (== #\\)
@@ -150,7 +150,7 @@
                  (>> parser:read-char
                      (pure (mconcat lst))))))))
 
-  (declare array-parser (UFix -> parser:Parser :s (List JSON)))
+  (declare array-parser (UFix -> parser:Parser (List JSON)))
   (define (array-parser n)
     (let ((element-list-parser
             (parser:delay
@@ -175,9 +175,9 @@
                  (parser:guard-char (const coalton:True)
                                     element-list-parser))))))
 
-  (declare object-parser (UFix -> parser:Parser :s (map:Map coalton:String JSON)))
+  (declare object-parser (UFix -> parser:Parser (map:Map coalton:String JSON)))
   (define (object-parser n)
-    (let ((declare key-value-parser (parser:Parser :s (Tuple coalton:String JSON)))
+    (let ((declare key-value-parser (parser:Parser (Tuple coalton:String JSON)))
           (key-value-parser
             (parser:delay
              (do (key <- string-parser)
@@ -188,7 +188,7 @@
                                        (value <- (json-parser (1- n)))
                                     whitespace-parser
                                      (pure (Tuple key value))))))))
-          (declare key-value-list-parser (parser:Parser :s (List (Tuple coalton:String JSON))))
+          (declare key-value-list-parser (parser:Parser (List (Tuple coalton:String JSON))))
           (key-value-list-parser
             (parser:delay
              (do (h <- key-value-parser)
@@ -211,7 +211,7 @@
                                   (map (.< map:collect! iter:into-iter)
                                        key-value-list-parser)))))))
 
-  (declare digits-parser (parser:Parser :s coalton:String))
+  (declare digits-parser (parser:Parser coalton:String))
   (define digits-parser
     (let length>0-check =
       (fn (str)
@@ -243,9 +243,9 @@
           (cl:declare (cl:ignore e))
           (coalton None)))))
 
-  (declare number-parser (parser:Parser :s Double-Float))
+  (declare number-parser (parser:Parser Double-Float))
   (define number-parser
-    (let ((declare integer-parser (coalton:String -> parser:Parser :s Double-Float))
+    (let ((declare integer-parser (coalton:String -> parser:Parser Double-Float))
           (integer-parser
             (fn (head)
               (match (str:parse-int head)
@@ -255,7 +255,7 @@
                    ((Ok d) (pure d))
                    ((Err _) (fail (message-with "Unexpected string" head))))))))
 
-          (declare float-parser (coalton:String -> coalton:String -> coalton:String -> parser:Parser :s Double-Float))
+          (declare float-parser (coalton:String -> coalton:String -> coalton:String -> parser:Parser Double-Float))
           (float-parser
             (fn (head fraction exponent)
               (match (parse-float head fraction exponent)
@@ -265,7 +265,7 @@
                 ((Some float)
                  (pure float)))))
 
-          (declare head-parser (parser:Parser :s coalton:String))
+          (declare head-parser (parser:Parser coalton:String))
           (head-parser
             (let ((sign-parser
                     (fn (continue-parser)
@@ -284,7 +284,7 @@
                            (parser:guard-char digit1-9? digits-parser)))))
               (sign-parser main-parser)))
 
-          (declare fraction-parser (coalton:String -> (parser:Parser :s Double-Float)))
+          (declare fraction-parser (coalton:String -> (parser:Parser Double-Float)))
           (fraction-parser
             (fn (head)
               (>> parser:read-char
@@ -298,7 +298,7 @@
                            (parser:guard-char sep?
                                               (parser:delay (float-parser head fraction "0"))))))))))
 
-          (declare exponent-parser (coalton:String -> coalton:String -> (parser:Parser :s Double-Float)))
+          (declare exponent-parser (coalton:String -> coalton:String -> (parser:Parser Double-Float)))
           (exponent-parser
             (fn (head fraction)
               (>> parser:read-char
@@ -327,7 +327,7 @@
                (parser:guard-char sep?
                                   (parser:delay (integer-parser head)))))))))
 
-  (declare json-parser (Ufix -> parser:Parser :s JSON))
+  (declare json-parser (Ufix -> parser:Parser JSON))
   (define (json-parser n)
     (if (== n 0)
         (fail "Nesting depth exceeded")
@@ -351,8 +351,12 @@
 
   (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
   (define (parse! iter)
-    (parser:run! (json-parser 1024)
-                 (parser:make-port! iter)))
+    (result:map-err (fn (e)
+                      (match e
+                        ((parser:UnexpectedEof) "Unexpected eof")
+                        ((parser:Message s) s)))
+                    (parser:run! (json-parser 1024)
+                                 (parser:make-stream! iter))))
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)

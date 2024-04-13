@@ -1,6 +1,7 @@
 (defpackage #:tokyo.tojo.json/private/parser
   (:use #:coalton
         #:coalton-prelude)
+  (:shadow #:error)
   (:local-nicknames
    (#:iter #:coalton-library/iterator)
    (#:cell #:coalton-library/cell)
@@ -8,6 +9,7 @@
    (#:map #:coalton-library/ord-map)
    (#:output #:tokyo.tojo.json/private/output-stream))
   (:export #:Parser
+           #:Stream
            #:peek-char
            #:peek-char-or-eof
            #:read-char-or-eof
@@ -22,12 +24,10 @@
            #:Error
            #:Message
            #:UnexpectedEof
+           #:make-stream!
            #:delay
            #:run!
-           #:collect-while
-
-           #:Port
-           #:make-port!))
+           #:collect-while))
 
 (in-package #:tokyo.tojo.json/private/parser)
 
@@ -42,94 +42,75 @@
 
 (coalton-toplevel
   ;; JSON is LL(1) grammar, so it only requires lookahead of one character.
-  (define-type Port (%Port (Optional Char) (iter:Iterator Char)))
+  (define-type Stream (%Stream (Optional Char) (iter:Iterator Char)))
 
-  (define (make-port! iter)
-    (%Port (iter:next! iter) iter))
+  (declare peek (Stream -> Optional Char))
+  (define (peek (%Stream c _)) c)
 
-  (declare peek (Port -> Optional Char))
-  (define (peek (%Port c _)) c)
-
-  (declare read! (Port -> (Optional (Tuple Char Port))))
+  (declare read! (Stream -> (Optional (Tuple Char Stream))))
   (define (read! p)
     (match p
-      ((%Port (None) _) None)
-      ((%Port (Some c) iter)
+      ((%Stream (None) _) None)
+      ((%Stream (Some c) iter)
        (let c_ = (iter:next! iter))
-       (Some (Tuple c (%Port c_ iter))))))
+       (Some (Tuple c (%Stream c_ iter))))))
 
-  (declare end-or-read! ((Char -> Boolean) -> Port -> Optional (Tuple Char Port)))
-  (define (end-or-read! end? (%Port opt iter))
+  (declare end-or-read! ((Char -> Boolean) -> Stream -> Optional (Tuple Char Stream)))
+  (define (end-or-read! end? (%Stream opt iter))
     (match opt
       ((Some c)
        (if (end? c)
            None
            (progn
              (let c_ = (iter:next! iter))
-             (Some (Tuple c (%Port c_ iter))))))
+             (Some (Tuple c (%Stream c_ iter))))))
       ((None) None)))
 
   (repr :transparent)
-  (define-type (Parser :s :a)
-    (Parser ((Tuple Port (List :s)) -> Result String (Tuple3 :a Port (List :s)))))
+  (define-type (Parser :a) (Parser (Stream -> Result Error (Tuple :a Stream))))
 
-  (declare push (:s -> Parser :s Unit))
-  (define (push x)
-    (Parser
-     (fn ((Tuple in xs))
-       (pure (Tuple3 Unit in (Cons x xs))))))
+  (define-instance (Functor Parser)
+    (define (map f (Parser parse!))
+      (Parser
+       (fn (in)
+         (>>= (parse! in)
+              (fn ((Tuple x in_))
+                (pure (Tuple (f x) in_))))))))
 
-  (declare pop (Parser :s :s))
-  (define pop
-    (Parser
-     (fn ((Tuple in s))
-       (match s
-         ((Nil) (Err "Stack underflow"))
-         ((Cons x xs)
-          (pure (Tuple3 x in xs)))))))
+  (define-instance (Applicative Parser)
+    (define (pure p)
+      (Parser (fn (in) (Ok (Tuple p in)))))
 
-  (declare run! (Parser :s :a -> Port -> Result String :a))
-  (define (run! (Parser parse!) in)
-    (do ((Tuple3 x _ _) <- (parse! (Tuple in Nil)))
-        (pure x)))
-
-(define-instance (Functor (Parser :s))
-  (define (map f (Parser parse!))
-    (Parser
-     (fn (input)
-       (do ((Tuple3 x port stack) <- (parse! input))
-           (pure (Tuple3 (f x) port stack)))))))
-
-  (define-instance (Applicative (Parser :s))
-    (define (pure x)
-      (Parser (fn ((Tuple port stack))
-                (Ok (Tuple3 x port stack)))))
     (define (liftA2 op (Parser parse1!) (Parser parse2!))
       (Parser
-       (fn (input)
-         (>>= (parse1! input)
-              (fn ((Tuple3 x port stack))
-                (>>= (parse2! (Tuple port stack))
-                     (fn ((Tuple3 y port stack))
-                       (pure (Tuple3 (op x y) port stack))))))))))
+       (fn (in)
+         (>>= (parse1! in)
+              (fn ((Tuple x in_))
+                (>>= (parse2! in_)
+                     (fn ((Tuple y in__))
+                       (pure (Tuple (op x y) in__))))))))))
 
-  (define-instance (Monad (Parser :s))
+  (define-instance (Monad Parser)
     (define (>>= (Parser parse!) f)
       (Parser
-       (fn (input)
-         (do ((Tuple3 x port stack) <- (parse! input))
-             (let (Parser parse!) = (f x))
-             (parse! (Tuple port stack)))))))
+       (fn (in)
+         (>>= (parse! in)
+              (fn ((Tuple x in_))
+                (match (f x)
+                  ((Parser parse_!)
+                   (>>= (parse_! in_)
+                        (fn ((Tuple x_ in__))
+                          (pure (Tuple x_ in__))))))))))))
 
-  (define-instance (MonadFail (Parser :s))
+  (define-instance (MonadFail Parser)
     (define (fail msg)
-      (Parser (const (Err msg)))))
+      (Parser (const (Err (Message msg))))))
 
   (repr :transparent)
-  (define-type (Guard :s :a)
-    (%Guard ((Optional Char) -> (Optional (Parser :s :a)))))
+  (define-type (Guard :a)
+    (%Guard ((Optional Char) -> (Optional (Parser :a)))))
 
-  (declare guard ((Optional Char -> Optional :in) ->  (:in -> Parser :s :a) -> Guard :s :a))
+  (declare guard ((Optional Char -> Optional :in) ->  (:in -> Parser :a) -> Guard :a))
   (define (guard f make-parser)
     (%Guard (.> f (map make-parser))))
 
@@ -139,7 +120,7 @@
         (pure Unit)
         empty))
 
-  (declare guard-char ((Char -> Boolean) -> Parser :s :a -> Guard :s :a))
+  (declare guard-char ((Char -> Boolean) -> Parser :a -> Guard :a))
   (define (guard-char p? parser)
     (guard (fn (opt)
              (do (c <- opt)
@@ -151,30 +132,30 @@
              (alt-guard (optional:none? opt)))
            (fn ((Unit)) parser)))
 
-  (declare guard-lookup (map:Map Char :b -> (:b -> Parser :s :a) -> Guard :s :a))
+  (declare guard-lookup (map:Map Char :b -> (:b -> Parser :a) -> Guard :a))
   (define (guard-lookup m make-parser)
     (%Guard (fn (opt)
               (do (c <- opt)
                   (x <- (map:lookup m c))
                 (pure (make-parser x))))))
 
-  (declare guard-else (Parser :s :a -> Guard :s :a))
+  (declare guard-else (Parser :a -> Guard :a))
   (define (guard-else parser)
     (%Guard (const (pure parser))))
 
-  (define-instance (Functor (Guard :s))
+  (define-instance (Functor Guard)
     (define (map f (%Guard g))
       (%Guard (fn (c)
                 (map (map f) (g c))))))
 
-  (define-instance (Applicative (Guard :s))
+  (define-instance (Applicative Guard)
     (define (pure x)
       (%Guard (fn (_) (Some (pure x)))))
     (define (liftA2 f (%Guard g1) (%Guard g2))
       (%Guard (fn (c)
                 (liftA2 (liftA2 f) (g1 c) (g2 c))))))
 
-  (define-instance (Alternative (Guard :s))
+  (define-instance (Alternative Guard)
     (define empty (%Guard (fn (_) None)))
     (define (alt (%Guard g1) (%Guard g2))
       (%Guard (fn (c)
@@ -187,7 +168,7 @@
                          ((Some _) x2)
                          ((None) None))))))))))
 
-  (declare from-guard (Guard :s :a -> Parser :s :a))
+  (declare from-guard (Guard :a -> Parser :a))
   (define (from-guard (%Guard g))
     (do (opt <- peek-char-or-eof)
         (match (g opt)
@@ -197,71 +178,88 @@
              ((Some c) (fail (<> "Unexpected char: " (into (make-list c)))))
              ((None) (fail "Unexpected eof")))))))
 
-  (declare peek-char-or-eof (Parser :s (Optional Char)))
+  (declare peek-char-or-eof (Parser (Optional Char)))
   (define peek-char-or-eof
-    (Parser (fn ((Tuple port stack)) (Ok (Tuple3 (peek port) port stack)))))
+    (Parser (fn (in) (Ok (Tuple (peek in) in)))))
 
-  (declare peek-char (Parser :s Char))
+  (declare peek-char (Parser Char))
   (define peek-char
     (do (opt <- peek-char-or-eof)
         (match opt
           ((Some c) (pure c))
-          ((None) (Parser (const (Err "Unexpected eof")))))))
+          ((None) (Parser (const (Err UnexpectedEof)))))))
 
-  (declare read-char-or-eof (Parser :s (Optional Char)))
+  (declare read-char-or-eof (Parser (Optional Char)))
   (define read-char-or-eof
     (Parser
-     (fn ((Tuple port stack))
-       (match (read! port)
-         ((Some (Tuple c port))  (Ok (Tuple3 (Some c) port stack)))
-         ((None) (Ok (Tuple3 None port stack)))))))
+     (fn (in)
+       (match (read! in)
+         ((Some (Tuple c in_))  (Ok (Tuple (Some c) in_)))
+         ((None) (Ok (Tuple None in)))))))
 
-  (declare read-char (Parser :s Char))
+  (declare read-char (Parser Char))
   (define read-char
     (Parser
-     (fn ((Tuple port stack))
-       (match (read! port)
-         ((Some (Tuple c port)) (Ok (Tuple3 c port stack)))
-         ((None) (Err "Unexpected eof"))))))
+     (fn (in)
+       (match (read! in)
+         ((Some (Tuple c in_)) (Ok (Tuple c in_)))
+         ((None) (Err UnexpectedEof))))))
 
-  (declare take-until-string ((Char -> Boolean) -> Parser :s String))
+  (declare take-until-string ((Char -> Boolean) -> Parser String))
   (define (take-until-string end?)
     (Parser
-     (fn ((Tuple port stack))
+     (fn (in)
        (let ((out (output:make-string-output-stream))
-             (cell (cell:new port)))
+             (cell (cell:new in)))
          (while-let (Some (Tuple c next)) = (end-or-read! end? (cell:read cell))
                     (cell:write! cell next)
                     (output:write-char c out))
          (Ok
-          (Tuple3 (output:get-output-stream-string out)
-                  (cell:read cell)
-                  stack))))))
+          (Tuple (output:get-output-stream-string out)
+                 (cell:read cell)))))))
 
-  (declare collect-while ((Char -> Optional (Parser :s :a)) -> Parser :s (List :a)))
+  (define-type Error
+    UnexpectedEof
+    (Message String))
+
+  (define-instance (Eq Error)
+    (define (== a b)
+      (match (Tuple a b)
+        ((Tuple (UnexpectedEof) (UnexpectedEof)) True)
+        ((Tuple (Message x) (Message y)) (== x y))
+        (_ False))))
+
+  (declare make-stream! (iter:Iterator Char -> Stream))
+  (define (make-stream! iter)
+    (%Stream (iter:next! iter) iter))
+
+  (declare run! (Parser :a -> Stream -> Result Error :a))
+  (define (run! (Parser parse!) in)
+    (>>= (parse! in)
+         (fn ((Tuple x _))
+           (pure x))))
+
+  (declare collect-while ((Char -> Optional (Parser :a)) -> Parser (List :a)))
   (define (collect-while f)
     (Parser
-     (fn ((Tuple port stack))
+     (fn (in)
        (let result = (cell:new Nil))
-       (let port* = (cell:new port))
-       (let stack* = (cell:new stack))
+       (let in* = (cell:new in))
        (loop
-        (match (peek (cell:read port*))
-          ((Some c)
-           (match (f c)
-             ((None) (break))
-             ((Some (Parser parse!))
-              (match (parse! (Tuple (cell:read port*) (cell:read stack*)))
-                ((Ok (Tuple3 elem port stack))
-                 (cell:write! port* port)
-                 (cell:write! stack* stack)
-                 (cell:write! result
-                              (cons elem (cell:read result)))
-                 Unit)
-                ((Err e)
-                 (return (Err e)))))))
-          ((None)
-           (return (Err "Unexpected eof")))))
-       (pure (Tuple3 (reverse (cell:read result))
-                     (cell:read port*)
-                     (cell:read stack*)))))))
+         (match (peek (cell:read in*))
+           ((Some c)
+            (match (f c)
+              ((None) (break))
+              ((Some (Parser parse!))
+               (match (parse! (cell:read in*))
+                 ((Ok (Tuple elem in_))
+                  (cell:write! in* in_)
+                  (cell:write! result
+                               (cons elem (cell:read result)))
+                  Unit)
+                 ((Err e)
+                  (return (Err e)))))))
+           ((None)
+            (return (Err UnexpectedEof)))))
+       (pure (Tuple (reverse (cell:read result))
+                    (cell:read in*)))))))
