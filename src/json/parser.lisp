@@ -272,16 +272,6 @@
     Start-Parse-Object
     Continue-Parse-Object)
 
-  (define (atom? x)
-    (match x
-      ((Null) coalton:True)
-      ((True) coalton:True)
-      ((False) coalton:True)
-      ((String _) coalton:True)
-      ((Number _) coalton:True)
-      ((Array _) coalton:True)
-      ((Object _) coalton:True)))
-
   (declare zipper-parser (parser:Parser Zipper))
   (define zipper-parser
     (let ((parse-atom
