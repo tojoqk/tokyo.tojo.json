@@ -27,7 +27,8 @@
            #:make-stream!
            #:delay
            #:run!
-           #:collect-while))
+           #:collect-while
+           #:fold-while))
 
 (in-package #:tokyo.tojo.json/private/parser)
 
@@ -262,4 +263,25 @@
            ((None)
             (return (Err UnexpectedEof)))))
        (pure (Tuple (reverse (cell:read result))
-                    (cell:read in*)))))))
+                    (cell:read in*))))))
+
+  (declare fold-while ((:c -> :a -> Parser (Tuple (Optional :c) :a)) -> :c -> :a -> Parser :a))
+  (define (fold-while f state acc)
+    (Parser
+     (fn (port)
+       (let port* = (cell:new port))
+       (let state* = (cell:new state))
+       (let acc* = (cell:new acc))
+       (loop
+         (let (Parser parse!) = (f (cell:read state*) (cell:read acc*)))
+         (match (parse! (cell:read port*))
+           ((Ok (Tuple (Tuple opt acc) port))
+            (cell:write! port* port)
+            (cell:write! acc* acc)
+            (match opt
+              ((Some state)
+               (cell:write! state* state)
+               Unit)
+              ((None) (break))))
+           ((Err e) (return (Err e)))))
+       (Ok (Tuple (cell:read acc*) (cell:read port*)))))))
