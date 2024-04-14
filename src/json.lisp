@@ -188,7 +188,7 @@
         (== c #\")))
 
   (declare word-parser (parser:Parser coalton:String))
-  (define word-parser (parser:delay (take-until-parser sep?)))
+  (define word-parser (take-until-parser sep?))
 
   (declare null-parser (parser:Parser Unit))
   (define null-parser
@@ -424,17 +424,16 @@
             (fn (z state)
               (let ((declare key-value-parser (parser:Parser (Tuple coalton:String JSON)))
                     (key-value-parser
-                      (parser:delay
-                       (do (key <- string-parser)
-                           skip-whitespaces
-                           (ch <- parser:peek-char)
-                           (match ch
-                             (#\:
-                              (do parser:read-char
-                                  (value <- shallow-json-parser)
-                                  skip-whitespaces
-                                  (pure (Tuple key value))))
-                             (_ (fail-unexpected-char ch))))))
+                      (do (key <- string-parser)
+                          skip-whitespaces
+                          (ch <- parser:peek-char)
+                          (match ch
+                            (#\:
+                             (do parser:read-char
+                                 (value <- shallow-json-parser)
+                                 skip-whitespaces
+                                 (pure (Tuple key value))))
+                            (_ (fail-unexpected-char ch)))))
                     (empty-next
                       (fn ()
                         (match z

@@ -16,7 +16,6 @@
            #:read-char-or-eof
            #:read-char
            #:take-until-string
-           #:delay
            #:run!
            #:collect-while
            #:fold-while))
@@ -24,13 +23,6 @@
 (in-package #:tokyo.tojo.json/private/parser)
 
 (named-readtables:in-readtable coalton:coalton)
-
-(cl:defmacro delay (expr)
-  (cl:let ((in (cl:gensym))
-           (parse! (cl:gensym)))
-    `(Parser (fn (,in)
-               (let (Parser ,parse!) = ,expr)
-               (,parse! ,in)))))
 
 (coalton-toplevel
 
