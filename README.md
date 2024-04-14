@@ -59,17 +59,17 @@ See [docs/reference.md](./docs/reference.md) file.
 
   (declare eval (String -> (Optional Double-Float)))
   (define (eval str)
-    (do (json <- (as-optional (json:parse str)))
+    (do (json <- (as-optional (tryInto str)))
         (obj <- (get-object json))
-      (left <- (>>= (map:lookup obj "left")
-                    get-number))
-      (op <- (>>= (map:lookup obj "op")
-                  get-string))
-      (right <- (>>= (map:lookup obj "right")
-                     get-number))
-      (match op
-        ("+" (pure (+ left right)))
-        (_ (default))))))
+        (left <- (>>= (map:lookup obj "left")
+                      get-number))
+        (op <- (>>= (map:lookup obj "op")
+                    get-string))
+        (right <- (>>= (map:lookup obj "right")
+                       get-number))
+        (match op
+          ("+" (pure (+ left right)))
+          (_ (default))))))
 ```
 
 in REPL:
