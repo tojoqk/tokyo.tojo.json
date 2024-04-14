@@ -4,55 +4,73 @@
 
 (define-test parse-symbol-test ()
   (matches (Ok json:Null)
-      (json:parse "null"))
+      (the (Result String json:JSON)
+           (tryInto "null")))
   (matches (Ok json:True)
-      (json:parse "true"))
+      (the (Result String json:JSON)
+           (tryInto "true")))
   (matches (Ok json:False)
-      (json:parse "false"))
+      (the (Result String json:JSON)
+           (tryInto "false")))
   (matches (Err _)
-      (json:parse "nil")))
+      (the (Result String json:JSON)
+           (tryInto "nil"))))
 
 (define-test parse-number-test ()
   (matches (Ok (json:Number 42.0d0))
-      (json:parse "42"))
+      (the (Result String json:JSON)
+           (tryInto "42")))
   (matches (Ok (json:Number 42.0d0))
-      (json:parse "  42.0  "))
+      (the (Result String json:JSON)
+           (tryInto "  42.0  ")))
   (matches (Ok (json:Number 42.0d0))
-      (json:parse "   42e0"))
+      (the (Result String json:JSON)
+           (tryInto "   42e0")))
   (matches (Ok (json:Number 420d0))
-      (json:parse "42e001"))
+      (the (Result String json:JSON)
+           (tryInto "42e001")))
   (matches (Ok (json:Number 4200d0))
-      (json:parse "42e2"))
+      (the (Result String json:JSON)
+           (tryInto "42e2")))
   (matches (Ok (json:Number 123456789d0))
-      (json:parse "123456789"))
+      (the (Result String json:JSON)
+           (tryInto "123456789")))
   (matches (Ok (json:Number 4200d0))
-      (json:parse "42e+2"))
+      (the (Result String json:JSON)
+           (tryInto "42e+2")))
   (matches (Ok (json:Number 0.42d0))
-      (json:parse "42e-2"))
+      (the (Result String json:JSON)
+           (tryInto "42e-2")))
   (matches (Err _)
-      (json:parse "0123"))
+      (the (Result String json:JSON)
+           (tryInto "0123")))
   (matches (Err _)
-      (json:parse "133."))
+      (the (Result String json:JSON)
+           (tryInto "133.")))
   (matches (Err _)
-      (json:parse "133a")))
+      (the (Result String json:JSON)
+           (tryInto "133a"))))
 
 (define-test parse-string-test ()
   (matches (Ok (json:String "hello"))
-      (json:parse "\"hello\"")))
+      (the (Result String json:JSON)
+           (tryInto "\"hello\""))))
 
 (define-test parse-array-test ()
   (is (pipe "[\"hello\", 3, true, false  ]"
-            json:parse
+            tryInto
             (== (Ok (json:Array
                      (make-list (json:String "hello")
                                 (json:Number 3d0)
                                 json:True
                                 json:False))))))
   (matches (Err _)
-      (json:parse "[133, ]"))
+      (the (Result String json:JSON)
+           (tryInto "[133, ]")))
   (matches (Err _)
-      (json:parse "[133, , 3]"))
-  (is (pipe (json:parse "[133, [1, 2, 3], 3]")
+      (the (Result String json:JSON)
+           (tryInto "[133, , 3]")))
+  (is (pipe (tryInto "[133, [1, 2, 3], 3]")
             (== (Ok (json:Array
                      (make-list (json:Number 133d0)
                                 (json:Array
@@ -71,13 +89,13 @@
 
 (define-test parse-object-test ()
   (is (pipe "{\"hello\" : \"world\" }"
-            json:parse
+            tryInto
             (== (Ok (make-object
                      (make-list (Tuple "hello" (json:String "world"))))))))
   (is (pipe "
 {\"test\" : 42, \"object\": { \"true\": true, \"false\" : false },
  \"array\": [10, 3.2, \"test\"], \"null\" : null }"
-            json:parse
+            tryInto
             (== (Ok (make-object
                      (make-list (Tuple "test" (json:Number 42d0))
                                 (Tuple "object"
@@ -91,11 +109,13 @@
                                                    (json:String "test"))))
                                 (Tuple "null" json:Null)))))))
   (matches (Ok (json:Object Nil))
-      (json:parse "{}"))
+      (tryInto "{}"))
   (matches (Err _)
-      (json:parse "{,}"))
+      (the (Result String json:JSON)
+           (tryInto "{,}")))
   (matches (Err _)
-      (json:parse "{\"test\" : 42,}")))
+      (the (Result String json:JSON)
+           (tryInto "{\"test\" : 42,}"))))
 
 (define-test parse-multiple-jsons ()
   (matches (Ok (Cons (json:Array (Cons (json:Number 1d0)
