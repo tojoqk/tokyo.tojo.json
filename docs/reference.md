@@ -32,7 +32,9 @@ A representation of a JSON object.
 #### <code>(PARSE STR)</code> <sup><sub>FUNCTION</sub></sup><a name="parse-value"></a>
 <code>(<a href="#string-type">STRING</a> &rarr; (<a href="#result-type">RESULT</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>))</code>
 
-Parse the given JSON string `str` and return a corresponding JSON type object.
+Parse the JSON string `STR`.
+
+Returns a JSON type object if successful, otherwise returns an error message.
 
 
 ***
@@ -40,7 +42,7 @@ Parse the given JSON string `str` and return a corresponding JSON type object.
 #### <code>(PARSE* ITER)</code> <sup><sub>FUNCTION</sub></sup><a name="parse*-value"></a>
 <code>((<a href="#iterator-type">ITERATOR</a> <a href="#char-type">CHAR</a>) &rarr; (<a href="#iterator-type">ITERATOR</a> (<a href="#result-type">RESULT</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>)))</code>
 
-Parse the JSON data from the given iterator of char `iter` and return a corresponding iterator of JSON.
+Create an iterator of JSON objects from the character iterator `ITER` containing JSON data.
 
 
 ***

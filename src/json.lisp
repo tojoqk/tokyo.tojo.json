@@ -544,12 +544,14 @@
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)
-    "Parse the given JSON string `str` and return a corresponding JSON type object."
+    "Parse the JSON string `STR`.
+
+Returns a JSON type object if successful, otherwise returns an error message."    
     (parse! (iter:into-iter str)))
 
   (declare parse* (iter:Iterator Char -> Iterator (Result coalton:String JSON)))
   (define (parse* iter)
-    "Parse the JSON data from the given iterator of char `iter` and return a corresponding iterator of JSON."
+    "Create an iterator of JSON objects from the character iterator `ITER` containing JSON data."
     (let port* = (cell:new (port:make! iter)))
     (let parser = (do skip-whitespaces
                       (opt-ch <- parser:peek-char-or-eof)
