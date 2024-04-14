@@ -265,17 +265,17 @@
        (pure (Tuple (reverse (cell:read result))
                     (cell:read in*))))))
 
-  (declare fold-while ((:c -> :a -> Parser (Tuple (Optional :c) :a)) -> :c -> :a -> Parser :a))
-  (define (fold-while f state acc)
+  (declare fold-while ((:a -> :c -> Parser (Tuple :a (Optional :c))) -> :a -> :c -> Parser :a))
+  (define (fold-while f acc state)
     (Parser
      (fn (port)
        (let port* = (cell:new port))
-       (let state* = (cell:new state))
        (let acc* = (cell:new acc))
+       (let state* = (cell:new state))
        (loop
-         (let (Parser parse!) = (f (cell:read state*) (cell:read acc*)))
+         (let (Parser parse!) = (f (cell:read acc*) (cell:read state*)))
          (match (parse! (cell:read port*))
-           ((Ok (Tuple (Tuple opt acc) port))
+           ((Ok (Tuple (Tuple acc opt) port))
             (cell:write! port* port)
             (cell:write! acc* acc)
             (match opt
