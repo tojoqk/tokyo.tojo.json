@@ -13,12 +13,6 @@ A representation of a JSON object.
 
 - <code><a href="#runtimerepr-class">RUNTIMEREPR</a> <a href="#json-type">JSON</a></code>
 - <code><a href="#eq-class">EQ</a> <a href="#json-type">JSON</a></code>
-- <code><a href="#into-class">INTO</a> <a href="#unit-type">UNIT</a> <a href="#json-type">JSON</a></code>
-- <code><a href="#into-class">INTO</a> <a href="#boolean-type">BOOLEAN</a> <a href="#json-type">JSON</a></code>
-- <code><a href="#into-class">INTO</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a></code>
-- <code><a href="#into-class">INTO</a> <a href="#double-float-type">DOUBLE-FLOAT</a> <a href="#json-type">JSON</a></code>
-- <code><a href="#into-class">INTO</a> (<a href="#list-type">LIST</a> <a href="#json-type">JSON</a>) <a href="#json-type">JSON</a></code>
-- <code><a href="#into-class">INTO</a> (<a href="#map-type">MAP</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>) <a href="#json-type">JSON</a></code>
 - <code><a href="#into-class">INTO</a> <a href="#json-type">JSON</a> <a href="#string-type">STRING</a></code>
 - <code><a href="#tryinto-class">TRYINTO</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a></code>
 
