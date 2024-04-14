@@ -165,11 +165,10 @@
         None)))
 
   (define (non-empty-string parser)
-    (>>= parser
-         (fn (str)
-           (if (< 0 (str:length str))
-               (pure str)
-               (fail "Unexpected empty symbol")))))
+    (do (str <- parser)
+        (if (< 0 (str:length str))
+            (pure str)
+            (fail "Unexpected empty symbol"))))
 
   (define (write-take-until end?)
     (parser:do-while (do (opt-ch <- parser:peek-char-or-eof)
