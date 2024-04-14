@@ -19,14 +19,7 @@
            #:delay
            #:run!
            #:collect-while
-           #:fold-while
-
-           #:guard
-           #:guard-char
-           #:guard-eof
-           #:guard-lookup
-           #:guard-else
-           #:from-guard))
+           #:fold-while))
 
 (in-package #:tokyo.tojo.json/private/parser)
 
@@ -208,80 +201,4 @@
                Unit)
               ((None) (break))))
            ((Err e) (return (Err e)))))
-       (Ok (Tuple (cell:read acc*) (cell:read port*))))))
-
-  ;;
-  ;; Guard
-  ;;
-
-  (repr :transparent)
-  (define-type (Guard :a)
-    (%Guard ((Optional Char) -> (Optional (Parser :a)))))
-
-  (declare guard ((Optional Char -> Optional :in) ->  (:in -> Parser :a) -> Guard :a))
-  (define (guard f make-parser)
-    (%Guard (.> f (map make-parser))))
-
-  (declare alt-guard (Alternative :f => Boolean -> (:f Unit)))
-  (define (alt-guard b)
-    (if b
-        (pure Unit)
-        empty))
-
-  (declare guard-char ((Char -> Boolean) -> Parser :a -> Guard :a))
-  (define (guard-char p? parser)
-    (guard (fn (opt)
-             (do (c <- opt)
-                 (alt-guard (p? c))))
-           (fn ((Unit)) parser)))
-
-  (define (guard-eof parser)
-    (guard (fn (opt)
-             (alt-guard (optional:none? opt)))
-           (fn ((Unit)) parser)))
-
-  (declare guard-lookup (map:Map Char :b -> (:b -> Parser :a) -> Guard :a))
-  (define (guard-lookup m make-parser)
-    (%Guard (fn (opt)
-              (do (c <- opt)
-                  (x <- (map:lookup m c))
-                  (pure (make-parser x))))))
-
-  (declare guard-else (Parser :a -> Guard :a))
-  (define (guard-else parser)
-    (%Guard (const (pure parser))))
-
-  (define-instance (Functor Guard)
-    (define (map f (%Guard g))
-      (%Guard (fn (c)
-                (map (map f) (g c))))))
-
-  (define-instance (Applicative Guard)
-    (define (pure x)
-      (%Guard (fn (_) (Some (pure x)))))
-    (define (liftA2 f (%Guard g1) (%Guard g2))
-      (%Guard (fn (c)
-                (liftA2 (liftA2 f) (g1 c) (g2 c))))))
-
-  (define-instance (Alternative Guard)
-    (define empty (%Guard (fn (_) None)))
-    (define (alt (%Guard g1) (%Guard g2))
-      (%Guard (fn (c)
-                (let ((x1 (g1 c)))
-                  (match x1
-                    ((Some _) x1)
-                    ((None)
-                     (let ((x2 (g2 c)))
-                       (match x2
-                         ((Some _) x2)
-                         ((None) None))))))))))
-
-  (declare from-guard (Guard :a -> Parser :a))
-  (define (from-guard (%Guard g))
-    (do (opt <- peek-char-or-eof)
-        (match (g opt)
-          ((Some p) p)
-          ((None)
-           (match opt
-             ((Some c) (fail (<> "Unexpected char: " (into (make-list c)))))
-             ((None) (fail "Unexpected eof"))))))))
+       (Ok (Tuple (cell:read acc*) (cell:read port*)))))))

@@ -237,27 +237,29 @@
   (define string-parser
     (let ((declare escaped-char-parser (parser:Parser coalton:String))
           (escaped-char-parser
-            (parser:from-guard
-             (alt* (parser:guard-lookup escape-char-map
-                                        (fn (c)
-                                          (>> parser:read-char
-                                              (pure (into (make-list c))))))
-                   (parser:guard-char (== #\u)
-                                      (do parser:read-char
-                                          (str <- (take-parser 4))
-                                          (match (>>= (parse-hex str) char:code-char)
-                                            ((None)
-                                             (fail-unexpected-string str))
-                                            ((Some c)
-                                             (pure (into (make-list c))))))))))
+            (do (ch <- parser:read-char)
+                (cond ((== ch #\u)
+                       (do
+                         (str <- (take-parser 4))
+                         (match (>>= (parse-hex str) char:code-char)
+                           ((None)
+                            (fail-unexpected-string str))
+                           ((Some ch)
+                            (pure (into (make-list ch)))))))
+                      (coalton:True
+                       (match (map:lookup escape-char-map ch)
+                         ((Some ch)
+                          (pure (into (make-list ch))))
+                         ((None)
+                          (fail-unexpected-char ch)))))))
           (declare substring-parser (parser:Parser coalton:String))
           (substring-parser
-            (parser:from-guard
-             (alt* (parser:guard-char (== #\\)
-                                      (>> parser:read-char
-                                          escaped-char-parser))
-                   (parser:guard-char (const coalton:True)
-                                      (take-until-parser (disjoin (== #\\) (== #\"))))))))
+            (do (ch <- parser:peek-char)
+                (cond ((== ch #\\)
+                       (do parser:read-char
+                           escaped-char-parser))
+                      (coalton:True
+                       (take-until-parser (disjoin (== #\\) (== #\"))))))))
       (>> parser:read-char
           (>>= (parser:collect-while
                 (fn (c)
@@ -277,15 +279,17 @@
             (fail "Unexpected empty symbol"))))
     (>>= (take-until-parser (complement digit?))
          (fn (str)
-           (parser:from-guard
-            (alt*
-             (parser:guard-eof (parser:delay (length>0-check str)))
-             (parser:guard-char (fn (c)
-                                  (or (sep? c)
-                                      (== c #\.)
-                                      (== c #\e)
-                                      (== c #\E)))
-                                (length>0-check str)))))))
+           (do (opt-ch <- parser:peek-char-or-eof)
+               (match opt-ch
+                 ((None) (length>0-check str))
+                 ((Some ch)
+                  (cond ((or (sep? ch)
+                             (== ch #\.)
+                             (== ch #\e)
+                             (== ch #\E))
+                         (length>0-check str))
+                        (coalton:True
+                         (fail-unexpected-char ch)))))))))
 
   (declare parse-float (coalton:String -> coalton:String -> coalton:String -> (Optional Double-Float)))
   (define (parse-float head fraction exponent)
@@ -325,63 +329,66 @@
           (head-parser
             (let ((sign-parser
                     (fn (continue-parser)
-                      (parser:from-guard
-                       (alt* (parser:guard-char (== #\-)
-                                                (>> parser:read-char
-                                                    (liftA2 <> (pure "-") continue-parser)))
-                             (parser:guard-else continue-parser)))))
+                      (do (ch <- parser:peek-char)
+                          (match ch
+                            (#\-
+                             (do parser:read-char
+                                 (liftA2 <> (pure "-") continue-parser)))
+                            (_ continue-parser)))))
                   (main-parser
-                    (parser:from-guard
-                     (alt* (parser:guard-char (== #\0)
-                                              (do (digits <- digits-parser)
-                                                  (if (== digits "0")
-                                                      (pure digits)
-                                                      (fail-unexpected-string digits))))
-                           (parser:guard-char digit1-9? digits-parser)))))
+                    (do (ch <- parser:peek-char)
+                        (cond
+                          ((== ch #\0)
+                           (do (digits <- digits-parser)
+                               (if (== digits "0")
+                                   (pure digits)
+                                   (fail-unexpected-string digits))))
+                          ((digit1-9? ch) digits-parser)
+                          (coalton:True
+                           (fail-unexpected-char ch))))))
               (sign-parser main-parser)))
-
           (declare fraction-parser (coalton:String -> (parser:Parser Double-Float)))
           (fraction-parser
             (fn (head)
               (>> parser:read-char
                   (>>= digits-parser
                        (fn (fraction)
-                         (parser:from-guard
-                          (alt*
-                           (parser:guard-eof (parser:delay (float-parser head fraction "0")))
-                           (parser:guard-char (disjoin (== #\e) (== #\E))
-                                              (parser:delay (exponent-parser head fraction)))
-                           (parser:guard-char sep?
-                                              (parser:delay (float-parser head fraction "0"))))))))))
+                         (do (opt-ch <- parser:peek-char-or-eof)
+                             (match opt-ch
+                               ((None) (float-parser head fraction "0"))
+                               ((Some ch)
+                                (cond ((or (== ch #\e) (== ch #\E)) (exponent-parser head fraction))
+                                      ((sep? ch) (float-parser head fraction "0"))
+                                      (coalton:True
+                                       (fail-unexpected-char ch)))))))))))
 
           (declare exponent-parser (coalton:String -> coalton:String -> (parser:Parser Double-Float)))
           (exponent-parser
             (fn (head fraction)
-              (>> parser:read-char
-                  (parser:from-guard
-                   (alt*
-                    (parser:guard-char (== #\+)
-                                       (>> parser:read-char
-                                           (>>= digits-parser (float-parser head fraction))))
-                    (parser:guard-char (== #\-)
-                                       (>> parser:read-char
-                                           (>>= (map (<> "-") digits-parser)
-                                                (float-parser head fraction))))
-                    (parser:guard-char (const coalton:True)
-                                       (>>= digits-parser
-                                            (float-parser head fraction)))))))))
-
+              (do parser:read-char
+                  (ch <- parser:peek-char)
+                  (cond ((== ch #\+)
+                         (do parser:read-char
+                             (exponent <- digits-parser)
+                             (float-parser head fraction exponent)))
+                        ((== ch #\-)
+                         (do parser:read-char
+                             (exponent <- (map (<> "-") digits-parser))
+                             (float-parser head fraction exponent)))
+                        (coalton:True
+                         (do (exponent <- digits-parser)
+                             (float-parser head fraction exponent))))))))
       (>>= head-parser
            (fn (head)
-             (parser:from-guard
-              (alt*
-               (parser:guard-eof (parser:delay (integer-parser head)))
-               (parser:guard-char (== #\.)
-                                  (parser:delay (fraction-parser head)))
-               (parser:guard-char (disjoin (== #\e) (== #\E))
-                                  (parser:delay (exponent-parser head "0")))
-               (parser:guard-char sep?
-                                  (parser:delay (integer-parser head)))))))))
+             (do (opt-ch <- parser:peek-char-or-eof)
+                 (match opt-ch
+                   ((None) (integer-parser head))
+                   ((Some ch)
+                    (cond ((== ch #\.) (fraction-parser head))
+                          ((or (== ch #\e) (== ch #\E)) (exponent-parser head "0"))
+                          ((sep? ch) (integer-parser head))
+                          (coalton:True
+                           (fail-unexpected-char ch))))))))))
 
   (define-type State
     Start-Parse-Array
@@ -420,12 +427,14 @@
                       (parser:delay
                        (do (key <- string-parser)
                            skip-whitespaces
-                           (parser:from-guard
-                            (parser:guard-char (== #\:)
-                                               (do parser:read-char
-                                                   (value <- shallow-json-parser)
-                                                   skip-whitespaces
-                                                   (pure (Tuple key value))))))))
+                           (ch <- parser:peek-char)
+                           (match ch
+                             (#\:
+                              (do parser:read-char
+                                  (value <- shallow-json-parser)
+                                  skip-whitespaces
+                                  (pure (Tuple key value))))
+                             (_ (fail-unexpected-char ch))))))
                     (empty-next
                       (fn ()
                         (match z
