@@ -22,7 +22,7 @@ If you are using Quicklisp, you can load the system with the following.
 
 ## Usage
 
-See [Reference](./docs/reference.md) file.
+See [docs/reference.md](./docs/reference.md) file.
 
 ### Examples
 
