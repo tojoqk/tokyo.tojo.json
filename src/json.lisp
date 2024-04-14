@@ -494,7 +494,7 @@
                                  (comma-next j (Zipper j (CrumbArray cr (Cons x l) r)) Continue-Parse-Array)))
                             (coalton:True
                              (fail-unexpected-char ch)))))
-                     (_ (coalton-prelude:error "zipper-parser: program error (Continue-Parse-Array)"))))
+                     (_ (error "zipper-parser: program error (Continue-Parse-Array)"))))
                   ((Start-Parse-Object)
                    (do skip-whitespaces
                        (ch <- parser:peek-char)
@@ -526,7 +526,7 @@
                                              Continue-Parse-Object)))
                             (coalton:True
                              (fail-unexpected-char ch)))))
-                     (_ (coalton-prelude:error "zipper-parser: program error (Continue-Parse-Object)")))))))))
+                     (_ (error "zipper-parser: program error (Continue-Parse-Object)")))))))))
       (do (z <- (map into shallow-json-parser))
           (match z
             ((Zipper (Null) _) (pure z))
