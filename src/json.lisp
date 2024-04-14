@@ -114,6 +114,8 @@
          (into (Zipper (Object (append (reverse l) (Cons (Tuple k x) r)))
                        c))))))
 
+  (define-instance (Iso JSON Zipper))
+
   ;;
   ;; JSON Parser
   ;;
