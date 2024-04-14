@@ -146,8 +146,8 @@
         (== c #\newline)
         (== c #\space)))
 
-  (declare whitespace-parser (parser:Parser Unit))
-  (define whitespace-parser
+  (declare skip-whitespaces (parser:Parser Unit))
+  (define skip-whitespaces
     (>> (parser:collect-while
          (fn (c)
            (if (whitespace? c)
@@ -396,7 +396,7 @@
   (define zipper-parser
     (let ((shallow-json-parser
             (let ((atom-parser (fn (parser) (map into parser))))
-              (do whitespace-parser
+              (do skip-whitespaces
                   (c <- parser:peek-char)
                   (cond
                     ((== c #\n) (atom-parser null-parser))
@@ -419,12 +419,12 @@
                     (key-value-parser
                       (parser:delay
                        (do (key <- string-parser)
-                           whitespace-parser
+                           skip-whitespaces
                            (parser:from-guard
                             (parser:guard-char (== #\:)
                                                (do parser:read-char
                                                    (value <- shallow-json-parser)
-                                                   whitespace-parser
+                                                   skip-whitespaces
                                                    (pure (Tuple key value))))))))
                     (empty-next
                       (fn ()
@@ -457,7 +457,7 @@
                             ((Object _) (pure (Tuple new-zipper (Some Start-Parse-Object)))))))))
                 (match state
                   ((Start-Parse-Array)
-                   (do whitespace-parser
+                   (do skip-whitespaces
                        (ch <- parser:peek-char)
                        (cond
                          ((== ch #\])
@@ -470,7 +470,7 @@
                   ((Continue-Parse-Array)
                    (match z
                      ((Zipper x (CrumbArray cr l r))
-                      (do whitespace-parser
+                      (do skip-whitespaces
                           (ch <- parser:peek-char)
                           (cond
                             ((== ch #\])
@@ -484,7 +484,7 @@
                              (fail-unexpected-char ch)))))
                      (_ (coalton-prelude:error "zipper-parser: program error (Continue-Parse-Array)"))))
                   ((Start-Parse-Object)
-                   (do whitespace-parser
+                   (do skip-whitespaces
                        (ch <- parser:peek-char)
                        (cond
                          ((== ch #\})
@@ -499,7 +499,7 @@
                   ((Continue-Parse-Object)
                    (match z
                      ((Zipper x (CrumbObject cr xk l r))
-                      (do whitespace-parser
+                      (do skip-whitespaces
                           (ch <- parser:peek-char)
                           (cond
                             ((== ch #\})
@@ -507,7 +507,7 @@
                                  (end-next (Zipper (make-object (append (reverse l) (Cons (Tuple xk x) r))) cr))))
                             ((== ch #\,)
                              (do parser:read-char
-                                 whitespace-parser
+                                 skip-whitespaces
                                  ((Tuple key j) <- key-value-parser)
                                  (comma-next j
                                              (Zipper j (CrumbObject cr key (Cons (Tuple xk x) l) r))
