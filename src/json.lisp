@@ -533,12 +533,8 @@
 
   (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
   (define (parse! iter)
-    (result:map-err (fn (e)
-                      (match e
-                        ((parser:UnexpectedEof) "Unexpected eof")
-                        ((parser:Message s) s)))
-                    (parser:run! json-parser
-                                 (parser:make-stream! iter))))
+    (parser:run! json-parser
+                 (parser:make-stream! iter)))
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)

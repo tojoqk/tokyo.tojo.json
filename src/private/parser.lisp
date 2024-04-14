@@ -1,7 +1,6 @@
 (defpackage #:tokyo.tojo.json/private/parser
   (:use #:coalton
         #:coalton-prelude)
-  (:shadow #:error)
   (:local-nicknames
    (#:iter #:coalton-library/iterator)
    (#:cell #:coalton-library/cell)
@@ -21,9 +20,6 @@
            #:guard-lookup
            #:guard-else
            #:from-guard
-           #:Error
-           #:Message
-           #:UnexpectedEof
            #:make-stream!
            #:delay
            #:run!
@@ -68,7 +64,7 @@
       ((None) None)))
 
   (repr :transparent)
-  (define-type (Parser :a) (Parser (Stream -> Result Error (Tuple :a Stream))))
+  (define-type (Parser :a) (Parser (Stream -> Result String (Tuple :a Stream))))
 
   (define-instance (Functor Parser)
     (define (map f (Parser parse!))
@@ -105,7 +101,7 @@
 
   (define-instance (MonadFail Parser)
     (define (fail msg)
-      (Parser (const (Err (Message msg))))))
+      (Parser (const (Err msg)))))
 
   (repr :transparent)
   (define-type (Guard :a)
@@ -188,7 +184,7 @@
     (do (opt <- peek-char-or-eof)
         (match opt
           ((Some c) (pure c))
-          ((None) (Parser (const (Err UnexpectedEof)))))))
+          ((None) (Parser (const (Err "Unexpected eof")))))))
 
   (declare read-char-or-eof (Parser (Optional Char)))
   (define read-char-or-eof
@@ -204,7 +200,7 @@
      (fn (in)
        (match (read! in)
          ((Some (Tuple c in_)) (Ok (Tuple c in_)))
-         ((None) (Err UnexpectedEof))))))
+         ((None) (Err "Unexpected eof"))))))
 
   (declare take-until-string ((Char -> Boolean) -> Parser String))
   (define (take-until-string end?)
@@ -219,22 +215,11 @@
           (Tuple (output:get-output-stream-string out)
                  (cell:read cell)))))))
 
-  (define-type Error
-    UnexpectedEof
-    (Message String))
-
-  (define-instance (Eq Error)
-    (define (== a b)
-      (match (Tuple a b)
-        ((Tuple (UnexpectedEof) (UnexpectedEof)) True)
-        ((Tuple (Message x) (Message y)) (== x y))
-        (_ False))))
-
   (declare make-stream! (iter:Iterator Char -> Stream))
   (define (make-stream! iter)
     (%Stream (iter:next! iter) iter))
 
-  (declare run! (Parser :a -> Stream -> Result Error :a))
+  (declare run! (Parser :a -> Stream -> Result String :a))
   (define (run! (Parser parse!) in)
     (>>= (parse! in)
          (fn ((Tuple x _))
@@ -261,7 +246,7 @@
                  ((Err e)
                   (return (Err e)))))))
            ((None)
-            (return (Err UnexpectedEof)))))
+            (return (Err "Unexpected eof")))))
        (pure (Tuple (reverse (cell:read result))
                     (cell:read in*))))))
 
