@@ -29,9 +29,9 @@
   (define (read! p)
     (match p
       ((%Port (None) _) None)
-      ((%Port (Some c) iter)
-       (let c_ = (iter:next! iter))
-       (Some (Tuple c (%Port c_ iter))))))
+      ((%Port (Some ch) iter)
+       (let next-ch = (iter:next! iter))
+       (Some (Tuple ch (%Port next-ch iter))))))
 
   (declare peek-or-read! ((char -> Boolean) -> Port -> Optional (Tuple Char Port)))
   (define (peek-or-read! read? (%Port opt iter))
