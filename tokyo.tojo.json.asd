@@ -7,6 +7,7 @@
   :serial t
   :pathname "src/"
   :components ((:file "private/output-stream")
+               (:file "private/port")
                (:file "private/parser")
                (:file "json"))
   :in-order-to ((test-op (test-op "tokyo.tojo.json/test"))))

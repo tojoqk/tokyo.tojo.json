@@ -13,6 +13,7 @@
    (#:list #:coalton-library/list)
    (#:result #:coalton-library/result)
    (#:output #:tokyo.tojo.json/private/output-stream)
+   (#:port #:tokyo.tojo.json/private/port)
    (#:parser #:tokyo.tojo.json/private/parser))
   (:export #:JSON
            #:Null
@@ -535,7 +536,7 @@
   (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
   (define (parse! iter)
     (parser:run! json-parser
-                 (parser:make-port! iter)))
+                 (port:make! iter)))
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)

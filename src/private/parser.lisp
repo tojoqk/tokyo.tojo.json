@@ -2,13 +2,10 @@
   (:use #:coalton
         #:coalton-prelude)
   (:local-nicknames
-   (#:iter #:coalton-library/iterator)
    (#:cell #:coalton-library/cell)
-   (#:output #:tokyo.tojo.json/private/output-stream))
-  (:export #:Port
-           #:make-port!
-
-           #:Parser
+   (#:output #:tokyo.tojo.json/private/output-stream)
+   (#:port #:tokyo.tojo.json/private/port))
+  (:export #:Parser
            #:peek-char
            #:peek-char-or-eof
            #:read-char-or-eof
@@ -24,38 +21,8 @@
 
 (coalton-toplevel
 
-  ;;
-  ;; Port
-  ;;
-
-  ;; JSON is LL(1) grammar, so it only requires lookahead of one character.
-  (define-type Port (%Port (Optional Char) (iter:Iterator Char)))
-
-  (declare peek (Port -> Optional Char))
-  (define (peek (%Port c _)) c)
-
-  (declare read! (Port -> (Optional (Tuple Char Port))))
-  (define (read! p)
-    (match p
-      ((%Port (None) _) None)
-      ((%Port (Some c) iter)
-       (let c_ = (iter:next! iter))
-       (Some (Tuple c (%Port c_ iter))))))
-
-  (declare peek-or-read! ((char -> Boolean) -> Port -> Optional (Tuple Char Port)))
-  (define (peek-or-read! read? (%Port opt iter))
-    (do (ch <- opt)
-        (cond ((read? ch)
-               (let next-ch = (iter:next! iter))
-               (Some (Tuple ch (%Port next-ch iter))))
-              (True None))))
-
-  ;;
-  ;; Parser
-  ;;
-
   (repr :transparent)
-  (define-type (Parser :a) (Parser (Port -> Result String (Tuple :a Port))))
+  (define-type (Parser :a) (Parser (port:Port -> Result String (Tuple :a port:Port))))
 
   (define-instance (Functor Parser)
     (define (map f (Parser parse!))
@@ -90,7 +57,7 @@
 
   (declare peek-char-or-eof (Parser (Optional Char)))
   (define peek-char-or-eof
-    (Parser (fn (port) (Ok (Tuple (peek port) port)))))
+    (Parser (fn (port) (Ok (Tuple (port:peek port) port)))))
 
   (declare peek-char (Parser Char))
   (define peek-char
@@ -103,7 +70,7 @@
   (define read-char-or-eof
     (Parser
      (fn (port)
-       (match (read! port)
+       (match (port:read! port)
          ((Some (Tuple c port)) (Ok (Tuple (Some c) port)))
          ((None) (Ok (Tuple None port)))))))
 
@@ -111,7 +78,7 @@
   (define read-char
     (Parser
      (fn (port)
-       (match (read! port)
+       (match (port:read! port)
          ((Some (Tuple c port)) (Ok (Tuple c port)))
          ((None) (Err "Unexpected eof"))))))
 
@@ -121,18 +88,14 @@
      (fn (port)
        (let ((out (output:make-string-output-stream))
              (cell (cell:new port)))
-         (while-let (Some (Tuple c next)) = (peek-or-read! (complement end?) (cell:read cell))
+         (while-let (Some (Tuple c next)) = (port:peek-or-read! (complement end?) (cell:read cell))
                     (cell:write! cell next)
                     (output:write-char c out))
          (Ok
           (Tuple (output:get-output-stream-string out)
                  (cell:read cell)))))))
 
-  (declare make-port! (iter:Iterator Char -> Port))
-  (define (make-port! iter)
-    (%Port (iter:next! iter) iter))
-
-  (declare run! (Parser :a -> Port -> Result String :a))
+  (declare run! (Parser :a -> port:Port -> Result String :a))
   (define (run! (Parser parse!) port)
     (map fst (parse! port)))
 
@@ -143,7 +106,7 @@
        (let result = (cell:new Nil))
        (let port* = (cell:new port))
        (loop
-         (match (peek (cell:read port*))
+         (match (port:peek (cell:read port*))
            ((Some c)
             (match (f c)
               ((None) (break))
