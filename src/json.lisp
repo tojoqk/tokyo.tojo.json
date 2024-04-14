@@ -99,22 +99,18 @@
                  (List (Tuple coalton:String JSON))
                  (List (Tuple coalton:String JSON))))
 
-  (define-instance (Into JSON Zipper)
-    (define (into x)
-      (Zipper x CrumbTop)))
+  (define (to-zipper x)
+    (Zipper x CrumbTop))
 
-  (define-instance (Into Zipper JSON)
-    (define (into z)
-      (match z
-        ((Zipper x (CrumbTop)) x)
-        ((Zipper x (CrumbArray c l r))
-         (into (Zipper (Array (append (reverse l) (Cons x r)))
-                       c)))
-        ((Zipper x (CrumbObject c k l r))
-         (into (Zipper (Object (append (reverse l) (Cons (Tuple k x) r)))
-                       c))))))
-
-  (define-instance (Iso JSON Zipper))
+  (define (from-zipper z)
+    (match z
+      ((Zipper x (CrumbTop)) x)
+      ((Zipper x (CrumbArray c l r))
+       (from-zipper (Zipper (Array (append (reverse l) (Cons x r)))
+                            c)))
+      ((Zipper x (CrumbObject c k l r))
+       (from-zipper (Zipper (Object (append (reverse l) (Cons (Tuple k x) r)))
+                            c)))))
 
   ;;
   ;; JSON Parser
@@ -523,7 +519,7 @@
                             (coalton:True
                              (fail-unexpected-char ch)))))
                      (_ (error "zipper-parser: program error (Continue-Parse-Object)")))))))))
-      (do (z <- (map into shallow-json-parser))
+      (do (z <- (map to-zipper shallow-json-parser))
           (match z
             ((Zipper (Null) _) (pure z))
             ((Zipper (True) _) (pure z))
@@ -537,7 +533,7 @@
 
   (declare json-parser (parser:Parser JSON))
   (define json-parser
-    (map into zipper-parser))
+    (map from-zipper zipper-parser))
 
   (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
   (define (parse! iter)
