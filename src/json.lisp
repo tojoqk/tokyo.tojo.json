@@ -170,9 +170,16 @@
                (pure str)
                (fail "Unexpected empty symbol")))))
 
-  (declare take-until-parser ((Char -> Boolean) -> (parser:Parser coalton:String)))
-  (define (take-until-parser end?)
-    (parser:take-until-string end?))
+  (define (write-take-until end?)
+    (parser:do-while (do (opt-ch <- parser:peek-char-or-eof)
+                         (match opt-ch
+                           ((Some ch)
+                            (if (end? ch)
+                                (pure coalton:False)
+                                (do parser:read-char
+                                    (parser:write-char ch)
+                                    (pure coalton:True))))
+                           ((None) (pure coalton:False))))))
 
   (define (sep? c)
     (or (whitespace? c)
@@ -184,7 +191,10 @@
         (== c #\")))
 
   (declare word-parser (parser:Parser coalton:String))
-  (define word-parser (take-until-parser sep?))
+  (define word-parser
+    (do parser:clear
+        (write-take-until sep?)
+        parser:get-string))
 
   (declare null-parser (parser:Parser Unit))
   (define null-parser
@@ -231,8 +241,8 @@
 
   (declare string-parser (parser:Parser coalton:String))
   (define string-parser
-    (let ((declare escaped-char-parser (parser:Parser coalton:String))
-          (escaped-char-parser
+    (let ((declare write-escaped-char-parser (parser:Parser Unit))
+          (write-escaped-char-parser
             (do (ch <- parser:read-char)
                 (cond ((== ch #\u)
                        (do
@@ -241,35 +251,30 @@
                            ((None)
                             (fail-unexpected-string str))
                            ((Some ch)
-                            (pure (into (make-list ch)))))))
+                            (parser:write-char ch)))))
                       (coalton:True
                        (match (map:lookup escape-char-map ch)
                          ((Some ch)
-                          (pure (into (make-list ch))))
+                          (parser:write-char ch))
                          ((None)
                           (fail-unexpected-char ch)))))))
-          (declare substring-parser (parser:Parser coalton:String))
-          (substring-parser
+          (declare write-substring (parser:Parser Unit))
+          (write-substring
             (do (ch <- parser:peek-char)
                 (cond ((== ch #\\)
                        (do parser:read-char
-                           escaped-char-parser))
+                           write-escaped-char-parser))
                       (coalton:True
-                       (take-until-parser (disjoin (== #\\) (== #\"))))))))
+                       (write-take-until (disjoin (== #\\) (== #\"))))))))
       (do parser:read-char
-          (map output:get-output-stream-string
-               (parser:fold-while
-                (fn (stream (Unit))
-                  (do (ch <- parser:peek-char)
-                      (if (== ch #\")
-                          (do parser:read-char
-                              (pure (Tuple stream None)))
-                          (do (substring <- substring-parser)
-                              (progn
-                                (output:write-string substring stream)
-                                (pure (Tuple stream (Some Unit))))))))
-                (output:make-string-output-stream)
-                Unit)))))
+          parser:clear
+          (parser:do-while (do (ch <- parser:peek-char)
+                               (if (== ch #\")
+                                   (do parser:read-char
+                                       (pure coalton:False))
+                                   (do write-substring
+                                       (pure coalton:True)))))
+          parser:get-string)))
 
   (declare digits-parser (parser:Parser coalton:String))
   (define digits-parser
@@ -278,19 +283,20 @@
         (if (< 0 (str:length str))
             (pure str)
             (fail "Unexpected empty symbol"))))
-    (>>= (take-until-parser (complement digit?))
-         (fn (str)
-           (do (opt-ch <- parser:peek-char-or-eof)
-               (match opt-ch
-                 ((None) (length>0-check str))
-                 ((Some ch)
-                  (cond ((or (sep? ch)
-                             (== ch #\.)
-                             (== ch #\e)
-                             (== ch #\E))
-                         (length>0-check str))
-                        (coalton:True
-                         (fail-unexpected-char ch)))))))))
+    (do parser:clear
+        (write-take-until (complement digit?))
+        (str <- parser:get-string)
+        (opt-ch <- parser:peek-char-or-eof)
+        (match opt-ch
+          ((None) (length>0-check str))
+          ((Some ch)
+           (cond ((or (sep? ch)
+                      (== ch #\.)
+                      (== ch #\e)
+                      (== ch #\E))
+                  (length>0-check str))
+                 (coalton:True
+                  (fail-unexpected-char ch)))))))
 
   (declare parse-float (coalton:String -> coalton:String -> coalton:String -> (Optional Double-Float)))
   (define (parse-float head fraction exponent)

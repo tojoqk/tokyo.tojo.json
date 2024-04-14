@@ -10,10 +10,14 @@
            #:peek-char-or-eof
            #:read-char-or-eof
            #:read-char
-           #:take-until-string
            #:run!
            #:fold-while
-           #:do-while))
+           #:do-while
+
+           #:clear
+           #:get-string
+           #:write-char
+           #:write-string))
 
 (in-package #:tokyo.tojo.json/private/parser)
 
@@ -22,34 +26,36 @@
 (coalton-toplevel
 
   (repr :transparent)
-  (define-type (Parser :a) (Parser (port:Port -> Result String (Tuple :a port:Port))))
+  (define-type (Parser :a)
+    (Parser ((Tuple port:Port output:Stream) -> Result String (Tuple3 :a port:Port output:Stream))))
+
 
   (define-instance (Functor Parser)
     (define (map f (Parser parse!))
       (Parser
-       (fn (port)
-         (do ((Tuple x port) <- (parse! port))
-             (pure (Tuple (f x) port)))))))
+       (fn ((Tuple port stream))
+         (do ((Tuple3 x port stream) <- (parse! (Tuple port stream)))
+             (pure (Tuple3 (f x) port stream)))))))
 
   (define-instance (Applicative Parser)
     (define (pure x)
-      (Parser (fn (port) (Ok (Tuple x port)))))
+      (Parser (fn ((Tuple port stream)) (Ok (Tuple3 x port stream)))))
 
     (define (liftA2 op (Parser parse1!) (Parser parse2!))
       (Parser
-       (fn (port)
-         (do ((Tuple x port) <- (parse1! port))
-             ((Tuple y port) <- (parse2! port))
-             (pure (Tuple (op x y) port)))))))
+       (fn ((Tuple port stream))
+         (do ((Tuple3 x port stream) <- (parse1! (Tuple port stream)))
+             ((Tuple3 y port stream) <- (parse2! (Tuple port stream)))
+             (pure (Tuple3 (op x y) port stream)))))))
 
   (define-instance (Monad Parser)
     (define (>>= (Parser parse!) f)
       (Parser
-       (fn (port)
-         (do ((Tuple x port) <- (parse! port))
+       (fn ((Tuple port stream))
+         (do ((Tuple3 x port stream) <- (parse! (Tuple port stream)))
              (let (Parser parse!) = (f x))
-             ((Tuple x port) <- (parse! port))
-             (pure (Tuple x port)))))))
+             ((Tuple3 x port stream) <- (parse! (Tuple port stream)))
+             (pure (Tuple3 x port stream)))))))
 
   (define-instance (MonadFail Parser)
     (define (fail msg)
@@ -57,7 +63,8 @@
 
   (declare peek-char-or-eof (Parser (Optional Char)))
   (define peek-char-or-eof
-    (Parser (fn (port) (Ok (Tuple (port:peek port) port)))))
+    (Parser (fn ((Tuple port stream))
+              (Ok (Tuple3 (port:peek port) port stream)))))
 
   (declare peek-char (Parser Char))
   (define peek-char
@@ -69,48 +76,38 @@
   (declare read-char-or-eof (Parser (Optional Char)))
   (define read-char-or-eof
     (Parser
-     (fn (port)
+     (fn ((Tuple port stream))
        (match (port:read! port)
-         ((Some (Tuple c port)) (Ok (Tuple (Some c) port)))
-         ((None) (Ok (Tuple None port)))))))
+         ((Some (Tuple c port)) (Ok (Tuple3 (Some c) port stream)))
+         ((None) (Ok (Tuple3 None port stream)))))))
 
   (declare read-char (Parser Char))
   (define read-char
     (Parser
-     (fn (port)
+     (fn ((Tuple port stream))
        (match (port:read! port)
-         ((Some (Tuple c port)) (Ok (Tuple c port)))
+         ((Some (Tuple c port)) (Ok (Tuple3 c port stream)))
          ((None) (Err "Unexpected eof"))))))
-
-  (declare take-until-string ((Char -> Boolean) -> Parser String))
-  (define (take-until-string end?)
-    (Parser
-     (fn (port)
-       (let ((out (output:make-string-output-stream))
-             (cell (cell:new port)))
-         (while-let (Some (Tuple c next)) = (port:peek-or-read! (complement end?) (cell:read cell))
-                    (cell:write! cell next)
-                    (output:write-char c out))
-         (Ok
-          (Tuple (output:get-output-stream-string out)
-                 (cell:read cell)))))))
 
   (declare run! (Parser :a -> port:Port -> Result String :a))
   (define (run! (Parser parse!) port)
-    (map fst (parse! port)))
+    (map (fn ((Tuple3 x _ _)) x)
+         (parse! (Tuple port (output:make-string-output-stream)))))
 
   (declare fold-while ((:a -> :c -> Parser (Tuple :a (Optional :c))) -> :a -> :c -> Parser :a))
   (define (fold-while f acc state)
     (Parser
-     (fn (port)
+     (fn ((Tuple port stream))
        (let port* = (cell:new port))
        (let acc* = (cell:new acc))
        (let state* = (cell:new state))
+       (let stream* = (cell:new stream))
        (loop
          (let (Parser parse!) = (f (cell:read acc*) (cell:read state*)))
-         (match (parse! (cell:read port*))
-           ((Ok (Tuple (Tuple acc opt) port))
+         (match (parse! (Tuple (cell:read port*) (cell:read stream*)))
+           ((Ok (Tuple3 (Tuple acc opt) port stream))
             (cell:write! port* port)
+            (cell:write! stream* stream)
             (cell:write! acc* acc)
             (match opt
               ((Some state)
@@ -118,7 +115,9 @@
                Unit)
               ((None) (break))))
            ((Err e) (return (Err e)))))
-       (Ok (Tuple (cell:read acc*) (cell:read port*))))))
+       (Ok (Tuple3 (cell:read acc*)
+                   (cell:read port*)
+                   (cell:read stream*))))))
 
   (declare do-while (Parser Boolean -> Parser Unit))
   (define (do-while p)
@@ -128,4 +127,30 @@
                           (pure (Tuple Unit (Some Unit)))
                           (pure (Tuple Unit None)))))
                 Unit
-                Unit)))
+                Unit))
+
+  ;;
+  ;; String Buffer feature
+  ;;
+
+  (define clear
+    (Parser
+     (fn ((Tuple port _))
+       (Ok (Tuple3 Unit port (output:make-string-output-stream))))))
+
+  (define get-string
+    (Parser
+     (fn ((Tuple port stream))
+       (Ok (Tuple3 (output:get-output-stream-string stream) port stream)))))
+
+  (define (write-char ch)
+    (Parser
+     (fn ((Tuple port stream))
+       (output:write-char ch stream)
+       (Ok (Tuple3 Unit port stream)))))
+
+  (define (write-string str)
+    (Parser
+     (fn ((Tuple port stream))
+       (output:write-string str stream)
+       (Ok (Tuple3 Unit port stream))))))
