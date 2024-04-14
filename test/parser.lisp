@@ -83,7 +83,7 @@
                                                    (json:Number 3.2d0)
                                                    (json:String "test"))))
                                 (Tuple "null" json:Null)))))))
-  (matches (Ok (json:Object map:empty))
+  (matches (Ok (json:Object Nil))
       (json:parse "{}"))
   (matches (Err _)
       (json:parse "{,}"))
