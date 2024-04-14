@@ -14,8 +14,8 @@
            #:fold-while
            #:do-while
 
-           #:clear
-           #:get-string
+           #:push-new-buffer
+           #:pop-string
            #:write-char
            #:write-string))
 
@@ -27,35 +27,34 @@
 
   (repr :transparent)
   (define-type (Parser :a)
-    (Parser ((Tuple port:Port output:Stream) -> Result String (Tuple3 :a port:Port output:Stream))))
-
+    (Parser ((Tuple port:Port (List output:Stream)) -> Result String (Tuple3 :a port:Port (List output:Stream)))))
 
   (define-instance (Functor Parser)
     (define (map f (Parser parse!))
       (Parser
-       (fn ((Tuple port stream))
-         (do ((Tuple3 x port stream) <- (parse! (Tuple port stream)))
-             (pure (Tuple3 (f x) port stream)))))))
+       (fn ((Tuple port streams))
+         (do ((Tuple3 x port streams) <- (parse! (Tuple port streams)))
+             (pure (Tuple3 (f x) port streams)))))))
 
   (define-instance (Applicative Parser)
     (define (pure x)
-      (Parser (fn ((Tuple port stream)) (Ok (Tuple3 x port stream)))))
+      (Parser (fn ((Tuple port streams)) (Ok (Tuple3 x port streams)))))
 
     (define (liftA2 op (Parser parse1!) (Parser parse2!))
       (Parser
-       (fn ((Tuple port stream))
-         (do ((Tuple3 x port stream) <- (parse1! (Tuple port stream)))
-             ((Tuple3 y port stream) <- (parse2! (Tuple port stream)))
-             (pure (Tuple3 (op x y) port stream)))))))
+       (fn ((Tuple port streams))
+         (do ((Tuple3 x port streams) <- (parse1! (Tuple port streams)))
+             ((Tuple3 y port streams) <- (parse2! (Tuple port streams)))
+             (pure (Tuple3 (op x y) port streams)))))))
 
   (define-instance (Monad Parser)
     (define (>>= (Parser parse!) f)
       (Parser
-       (fn ((Tuple port stream))
-         (do ((Tuple3 x port stream) <- (parse! (Tuple port stream)))
+       (fn ((Tuple port streams))
+         (do ((Tuple3 x port streams) <- (parse! (Tuple port streams)))
              (let (Parser parse!) = (f x))
-             ((Tuple3 x port stream) <- (parse! (Tuple port stream)))
-             (pure (Tuple3 x port stream)))))))
+             ((Tuple3 x port streams) <- (parse! (Tuple port streams)))
+             (pure (Tuple3 x port streams)))))))
 
   (define-instance (MonadFail Parser)
     (define (fail msg)
@@ -63,8 +62,8 @@
 
   (declare peek-char-or-eof (Parser (Optional Char)))
   (define peek-char-or-eof
-    (Parser (fn ((Tuple port stream))
-              (Ok (Tuple3 (port:peek port) port stream)))))
+    (Parser (fn ((Tuple port streams))
+              (Ok (Tuple3 (port:peek port) port streams)))))
 
   (declare peek-char (Parser Char))
   (define peek-char
@@ -76,38 +75,38 @@
   (declare read-char-or-eof (Parser (Optional Char)))
   (define read-char-or-eof
     (Parser
-     (fn ((Tuple port stream))
+     (fn ((Tuple port streams))
        (match (port:read! port)
-         ((Some (Tuple c port)) (Ok (Tuple3 (Some c) port stream)))
-         ((None) (Ok (Tuple3 None port stream)))))))
+         ((Some (Tuple c port)) (Ok (Tuple3 (Some c) port streams)))
+         ((None) (Ok (Tuple3 None port streams)))))))
 
   (declare read-char (Parser Char))
   (define read-char
     (Parser
-     (fn ((Tuple port stream))
+     (fn ((Tuple port streams))
        (match (port:read! port)
-         ((Some (Tuple c port)) (Ok (Tuple3 c port stream)))
+         ((Some (Tuple c port)) (Ok (Tuple3 c port streams)))
          ((None) (Err "Unexpected eof"))))))
 
   (declare run! (Parser :a -> port:Port -> Result String :a))
   (define (run! (Parser parse!) port)
     (map (fn ((Tuple3 x _ _)) x)
-         (parse! (Tuple port (output:make-string-output-stream)))))
+         (parse! (Tuple port (singleton (output:make-string-output-stream))))))
 
   (declare fold-while ((:a -> :c -> Parser (Tuple :a (Optional :c))) -> :a -> :c -> Parser :a))
   (define (fold-while f acc state)
     (Parser
-     (fn ((Tuple port stream))
+     (fn ((Tuple port streams))
        (let port* = (cell:new port))
        (let acc* = (cell:new acc))
        (let state* = (cell:new state))
-       (let stream* = (cell:new stream))
+       (let streams* = (cell:new streams))
        (loop
          (let (Parser parse!) = (f (cell:read acc*) (cell:read state*)))
-         (match (parse! (Tuple (cell:read port*) (cell:read stream*)))
-           ((Ok (Tuple3 (Tuple acc opt) port stream))
+         (match (parse! (Tuple (cell:read port*) (cell:read streams*)))
+           ((Ok (Tuple3 (Tuple acc opt) port streams))
             (cell:write! port* port)
-            (cell:write! stream* stream)
+            (cell:write! streams* streams)
             (cell:write! acc* acc)
             (match opt
               ((Some state)
@@ -117,7 +116,7 @@
            ((Err e) (return (Err e)))))
        (Ok (Tuple3 (cell:read acc*)
                    (cell:read port*)
-                   (cell:read stream*))))))
+                   (cell:read streams*))))))
 
   (declare do-while (Parser Boolean -> Parser Unit))
   (define (do-while p)
@@ -133,24 +132,43 @@
   ;; String Buffer feature
   ;;
 
-  (define clear
+  (declare push-new-buffer (Parser Unit))
+  (define push-new-buffer
     (Parser
-     (fn ((Tuple port _))
-       (Ok (Tuple3 Unit port (output:make-string-output-stream))))))
+     (fn ((Tuple port streams))
+       (Ok (Tuple3 Unit
+                   port
+                   (Cons (output:make-string-output-stream)
+                         streams))))))
 
-  (define get-string
+  (declare pop-string (Parser String))
+  (define pop-string
     (Parser
-     (fn ((Tuple port stream))
-       (Ok (Tuple3 (output:get-output-stream-string stream) port stream)))))
+     (fn ((Tuple port streams))
+       (match streams
+         ((Cons s ss)
+          (Ok (Tuple3 (output:get-output-stream-string s) port ss)))
+         ((Nil)
+          (Err "pop-buffer: String buffer stack undeflow"))))))
 
+  (declare write-char (Char -> Parser Unit))
   (define (write-char ch)
     (Parser
-     (fn ((Tuple port stream))
-       (output:write-char ch stream)
-       (Ok (Tuple3 Unit port stream)))))
+     (fn ((Tuple port streams))
+       (match streams
+         ((Cons stream _)
+          (output:write-char ch stream)
+          (Ok (Tuple3 Unit port streams)))
+         ((Nil)
+          (Err "write-char: No string buffer"))))))
 
+  (declare write-string (String -> Parser Unit))
   (define (write-string str)
     (Parser
-     (fn ((Tuple port stream))
-       (output:write-string str stream)
-       (Ok (Tuple3 Unit port stream))))))
+     (fn ((Tuple port streams))
+       (match streams
+         ((Cons stream _)
+          (output:write-string str stream)
+          (Ok (Tuple3 Unit port streams)))
+         ((Nil)
+          (Err "write-string: No string buffer")))))))

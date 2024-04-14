@@ -192,9 +192,9 @@
 
   (declare word-parser (parser:Parser coalton:String))
   (define word-parser
-    (do parser:clear
+    (do parser:push-new-buffer
         (write-take-until sep?)
-        parser:get-string))
+        parser:pop-string))
 
   (declare null-parser (parser:Parser Unit))
   (define null-parser
@@ -267,14 +267,14 @@
                       (coalton:True
                        (write-take-until (disjoin (== #\\) (== #\"))))))))
       (do parser:read-char
-          parser:clear
+          parser:push-new-buffer
           (parser:do-while (do (ch <- parser:peek-char)
                                (if (== ch #\")
                                    (do parser:read-char
                                        (pure coalton:False))
                                    (do write-substring
                                        (pure coalton:True)))))
-          parser:get-string)))
+          parser:pop-string)))
 
   (declare digits-parser (parser:Parser coalton:String))
   (define digits-parser
@@ -283,9 +283,9 @@
         (if (< 0 (str:length str))
             (pure str)
             (fail "Unexpected empty symbol"))))
-    (do parser:clear
+    (do parser:push-new-buffer
         (write-take-until (complement digit?))
-        (str <- parser:get-string)
+        (str <- parser:pop-string)
         (opt-ch <- parser:peek-char-or-eof)
         (match opt-ch
           ((None) (length>0-check str))
