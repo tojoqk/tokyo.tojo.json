@@ -39,6 +39,7 @@
   ;;
 
   (define-type JSON
+    "A representation of a JSON object."
     Null
     True False
     (Number Double-Float)
@@ -542,10 +543,12 @@
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)
+    "Parse the given JSON string `str` and return a corresponding JSON type object."
     (parse! (iter:into-iter str)))
 
   (declare parse* (iter:Iterator Char -> Iterator (Result coalton:String JSON)))
   (define (parse* iter)
+    "Parse the JSON data from the given iterator of char `iter` and return a corresponding iterator of JSON."
     (let port* = (cell:new (port:make! iter)))
     (let parser = (do skip-whitespaces
                       (opt-ch <- parser:peek-char-or-eof)
