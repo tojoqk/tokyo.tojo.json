@@ -88,10 +88,10 @@
         ((Tuple (Object x) (Object y)) (== x y))
         (_ coalton:False))))
 
-
   ;;
   ;; Zipper
   ;;
+
   (define-type Zipper
     (Zipper JSON Crumb))
 
