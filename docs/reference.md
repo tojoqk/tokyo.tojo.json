@@ -42,7 +42,7 @@ Returns a JSON type object if successful, otherwise returns an error message.
 #### <code>(PARSE! ITER)</code> <sup><sub>FUNCTION</sub></sup><a name="parse!-value"></a>
 <code>((<a href="#iterator-type">ITERATOR</a> <a href="#char-type">CHAR</a>) &rarr; (<a href="#iterator-type">ITERATOR</a> (<a href="#result-type">RESULT</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>)))</code>
 
-Create an iterator of JSON objects from the character iterator `ITER` containing JSON data.
+Create an iterator of JSON objects from the character iterator `ITER` containing JSON data with a one-character lookahead process when called.
 
 
 ***

@@ -547,7 +547,7 @@ Returns a JSON type object if successful, otherwise returns an error message."
 
   (declare parse! (iter:Iterator Char -> Iterator (Result coalton:String JSON)))
   (define (parse! iter)
-    "Create an iterator of JSON objects from the character iterator `ITER` containing JSON data."
+    "Create an iterator of JSON objects from the character iterator `ITER` containing JSON data with a one-character lookahead process when called."
     (let port* = (cell:new (port:make! iter)))
     (let parser = (do skip-whitespaces
                       (opt-ch <- parser:peek-char-or-eof)
