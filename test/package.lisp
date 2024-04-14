@@ -1,6 +1,7 @@
 (defpackage #:tokyo.tojo.json/test
   (:use #:coalton-testing)
   (:local-nicknames
+   (#:iter #:coalton-library/iterator)
    (#:map #:coalton-library/ord-map)
    (#:json #:tokyo.tojo.json))
   (:export #:run-tests))
