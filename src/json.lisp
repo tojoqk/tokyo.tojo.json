@@ -115,7 +115,7 @@
          (into (Zipper (Array (append (reverse l) (Cons x r)))
                        c)))
         ((Zipper x (CrumbObject c k l r))
-         (into (Zipper (Object (map:collect! (iter:into-iter (append (reverse l) (Cons (Tuple k x) r)))))
+         (into (Zipper (make-object (append (reverse l) (Cons (Tuple k x) r)))
                        c))))))
 
   ;; 
