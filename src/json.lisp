@@ -298,9 +298,8 @@
                  (coalton:True
                   (fail-unexpected-char ch)))))))
 
-  (declare parse-float (coalton:String -> coalton:String -> coalton:String -> (Optional Double-Float)))
-  (define (parse-float head fraction exponent)
-    (let str = (mconcat (make-list head "." fraction "d" exponent)))
+  (declare parse-float (coalton:String -> (Optional Double-Float)))
+  (define (parse-float str)
     (lisp (Optional Double-Float) (str)
       (cl:handler-case
           (cl:let ((cl:*read-eval* cl:nil))
@@ -313,24 +312,19 @@
 
   (declare number-parser (parser:Parser Double-Float))
   (define number-parser
-    (let ((declare integer-parser (coalton:String -> parser:Parser Double-Float))
-          (integer-parser
-            (fn (head)
-              (match (str:parse-int head)
-                ((None) (fail-unexpected-string head))
-                ((Some int)
-                 (match (tryInto int)
-                   ((Ok d) (pure d))
-                   ((Err _) (fail-unexpected-string head)))))))
-
-          (declare float-parser (coalton:String -> coalton:String -> coalton:String -> parser:Parser Double-Float))
+    (let ((declare float-parser (coalton:String -> coalton:String -> coalton:String -> parser:Parser Double-Float))
           (float-parser
             (fn (head fraction exponent)
-              (match (parse-float head fraction exponent)
-                ((None)
-                 (fail-unexpected-string (mconcat (make-list head "." fraction "e" exponent))))
-                ((Some float)
-                 (pure float)))))
+              (do parser:push-new-buffer
+                  (parser:write-string head)
+                  (parser:write-string ".")
+                  (parser:write-string fraction)
+                  (parser:write-string "d")
+                  (parser:write-string exponent)
+                  (float-string <- parser:pop-string)
+                  (match (parse-float float-string)
+                    ((Some float) (pure float))
+                    ((None) (fail-unexpected-string (mconcat (make-list head "." fraction "e" exponent))))))))
 
           (declare head-parser (parser:Parser coalton:String))
           (head-parser
@@ -340,7 +334,8 @@
                           (match ch
                             (#\-
                              (do parser:read-char
-                                 (liftA2 <> (pure "-") continue-parser)))
+                                 (head <- continue-parser)
+                                 (pure (<> "-" head))))
                             (_ continue-parser)))))
                   (main-parser
                     (do (ch <- parser:peek-char)
@@ -354,20 +349,20 @@
                           (coalton:True
                            (fail-unexpected-char ch))))))
               (sign-parser main-parser)))
+
           (declare fraction-parser (coalton:String -> (parser:Parser Double-Float)))
           (fraction-parser
             (fn (head)
-              (>> parser:read-char
-                  (>>= digits-parser
-                       (fn (fraction)
-                         (do (opt-ch <- parser:peek-char-or-eof)
-                             (match opt-ch
-                               ((None) (float-parser head fraction "0"))
-                               ((Some ch)
-                                (cond ((or (== ch #\e) (== ch #\E)) (exponent-parser head fraction))
-                                      ((sep? ch) (float-parser head fraction "0"))
-                                      (coalton:True
-                                       (fail-unexpected-char ch)))))))))))
+              (do parser:read-char
+                  (fraction <- digits-parser)
+                  (opt-ch <- parser:peek-char-or-eof)
+                  (match opt-ch
+                    ((None) (float-parser head fraction "0"))
+                    ((Some ch)
+                     (cond ((or (== ch #\e) (== ch #\E)) (exponent-parser head fraction))
+                           ((sep? ch) (float-parser head fraction "0"))
+                           (coalton:True
+                            (fail-unexpected-char ch))))))))
 
           (declare exponent-parser (coalton:String -> coalton:String -> (parser:Parser Double-Float)))
           (exponent-parser
@@ -385,17 +380,16 @@
                         (coalton:True
                          (do (exponent <- digits-parser)
                              (float-parser head fraction exponent))))))))
-      (>>= head-parser
-           (fn (head)
-             (do (opt-ch <- parser:peek-char-or-eof)
-                 (match opt-ch
-                   ((None) (integer-parser head))
-                   ((Some ch)
-                    (cond ((== ch #\.) (fraction-parser head))
-                          ((or (== ch #\e) (== ch #\E)) (exponent-parser head "0"))
-                          ((sep? ch) (integer-parser head))
-                          (coalton:True
-                           (fail-unexpected-char ch))))))))))
+      (do (head <- head-parser)
+          (opt-ch <- parser:peek-char-or-eof)
+          (match opt-ch
+            ((None) (float-parser head "0" "0"))
+            ((Some ch)
+             (cond ((== ch #\.) (fraction-parser head))
+                   ((or (== ch #\e) (== ch #\E)) (exponent-parser head "0"))
+                   ((sep? ch) (float-parser head "0" "0"))
+                   (coalton:True
+                    (fail-unexpected-char ch))))))))
 
   (define-type State
     Start-Parse-Array
