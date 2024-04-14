@@ -151,7 +151,7 @@
     (>> (parser:collect-while
          (fn (c)
            (if (whitespace? c)
-               (Some parser:read-char )
+               (Some parser:read-char)
                None)))
         (pure Unit)))
 
