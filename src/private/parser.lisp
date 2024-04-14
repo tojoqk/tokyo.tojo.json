@@ -12,7 +12,6 @@
            #:read-char
            #:take-until-string
            #:run!
-           #:collect-while
            #:fold-while
            #:do-while))
 
@@ -99,31 +98,6 @@
   (declare run! (Parser :a -> port:Port -> Result String :a))
   (define (run! (Parser parse!) port)
     (map fst (parse! port)))
-
-  (declare collect-while ((Char -> Optional (Parser :a)) -> Parser (List :a)))
-  (define (collect-while f)
-    (Parser
-     (fn (port)
-       (let result = (cell:new Nil))
-       (let port* = (cell:new port))
-       (loop
-         (match (port:peek (cell:read port*))
-           ((Some c)
-            (match (f c)
-              ((None) (break))
-              ((Some (Parser parse!))
-               (match (parse! (cell:read port*))
-                 ((Ok (Tuple elem port))
-                  (cell:write! port* port)
-                  (cell:write! result
-                               (cons elem (cell:read result)))
-                  Unit)
-                 ((Err e)
-                  (return (Err e)))))))
-           ((None)
-            (return (Err "Unexpected eof")))))
-       (pure (Tuple (reverse (cell:read result))
-                    (cell:read port*))))))
 
   (declare fold-while ((:a -> :c -> Parser (Tuple :a (Optional :c))) -> :a -> :c -> Parser :a))
   (define (fold-while f acc state)
