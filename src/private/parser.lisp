@@ -88,9 +88,9 @@
          ((Some (Tuple c port)) (Ok (Tuple3 c port streams)))
          ((None) (Err "Unexpected eof"))))))
 
-  (declare run! (Parser :a -> port:Port -> Result String :a))
+  (declare run! (Parser :a -> port:Port -> Result String (Tuple :a port:Port)))
   (define (run! (Parser parse!) port)
-    (map (fn ((Tuple3 x _ _)) x)
+    (map (fn ((Tuple3 x port _)) (Tuple x port))
          (parse! (Tuple port (singleton (output:make-string-output-stream))))))
 
   (declare fold-while ((:a -> :c -> Parser (Tuple :a (Optional :c))) -> :a -> :c -> Parser :a))

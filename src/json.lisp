@@ -12,6 +12,7 @@
    (#:optional #:coalton-library/optional)
    (#:list #:coalton-library/list)
    (#:result #:coalton-library/result)
+   (#:cell #:coalton-library/cell)
    (#:output #:tokyo.tojo.json/private/output-stream)
    (#:port #:tokyo.tojo.json/private/port)
    (#:parser #:tokyo.tojo.json/private/parser))
@@ -25,7 +26,8 @@
            #:Object
 
            #:parse
-           #:parse!))
+           #:parse!
+           #:parse*))
 
 (in-package #:tokyo.tojo.json/json)
 
@@ -539,12 +541,27 @@
 
   (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
   (define (parse! iter)
-    (parser:run! json-parser
-                 (port:make! iter)))
+    (map fst (parser:run! json-parser (port:make! iter))))
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)
     (parse! (iter:into-iter str)))
+
+  (declare parse* (iter:Iterator Char -> Iterator (Result coalton:String JSON)))
+  (define (parse* iter)
+    (let port* = (cell:new (port:make! iter)))
+    (let parser = (do skip-whitespaces
+                      (opt-ch <- parser:peek-char-or-eof)
+                      (match opt-ch
+                        ((Some _) (map Some json-parser))
+                        ((None) (pure None)))))
+    (iter:new (fn ()
+                (match (parser:run! parser (cell:read port*))
+                  ((Ok (Tuple (Some x) port))
+                   (cell:write! port* port)
+                   (Some (Ok x)))
+                  ((Ok (Tuple (None) _)) None)
+                  ((Err e) (Some (Err e)))))))
 
   (define-instance (TryInto coalton:String JSON)
     (define tryInto parse))
