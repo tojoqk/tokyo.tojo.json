@@ -534,7 +534,7 @@
   (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
   (define (parse! iter)
     (parser:run! json-parser
-                 (parser:make-stream! iter)))
+                 (parser:make-port! iter)))
 
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)

@@ -7,24 +7,26 @@
    (#:optional #:coalton-library/optional)
    (#:map #:coalton-library/ord-map)
    (#:output #:tokyo.tojo.json/private/output-stream))
-  (:export #:Parser
-           #:Stream
+  (:export #:Port
+           #:make-port!
+
+           #:Parser
            #:peek-char
            #:peek-char-or-eof
            #:read-char-or-eof
            #:read-char
            #:take-until-string
+           #:delay
+           #:run!
+           #:collect-while
+           #:fold-while
+
            #:guard
            #:guard-char
            #:guard-eof
            #:guard-lookup
            #:guard-else
-           #:from-guard
-           #:make-stream!
-           #:delay
-           #:run!
-           #:collect-while
-           #:fold-while))
+           #:from-guard))
 
 (in-package #:tokyo.tojo.json/private/parser)
 
@@ -39,32 +41,32 @@
 
 (coalton-toplevel
   ;; JSON is LL(1) grammar, so it only requires lookahead of one character.
-  (define-type Stream (%Stream (Optional Char) (iter:Iterator Char)))
+  (define-type Port (%Port (Optional Char) (iter:Iterator Char)))
 
-  (declare peek (Stream -> Optional Char))
-  (define (peek (%Stream c _)) c)
+  (declare peek (Port -> Optional Char))
+  (define (peek (%Port c _)) c)
 
-  (declare read! (Stream -> (Optional (Tuple Char Stream))))
+  (declare read! (Port -> (Optional (Tuple Char Port))))
   (define (read! p)
     (match p
-      ((%Stream (None) _) None)
-      ((%Stream (Some c) iter)
+      ((%Port (None) _) None)
+      ((%Port (Some c) iter)
        (let c_ = (iter:next! iter))
-       (Some (Tuple c (%Stream c_ iter))))))
+       (Some (Tuple c (%Port c_ iter))))))
 
-  (declare end-or-read! ((Char -> Boolean) -> Stream -> Optional (Tuple Char Stream)))
-  (define (end-or-read! end? (%Stream opt iter))
+  (declare end-or-read! ((Char -> Boolean) -> Port -> Optional (Tuple Char Port)))
+  (define (end-or-read! end? (%Port opt iter))
     (match opt
       ((Some c)
        (if (end? c)
            None
            (progn
              (let c_ = (iter:next! iter))
-             (Some (Tuple c (%Stream c_ iter))))))
+             (Some (Tuple c (%Port c_ iter))))))
       ((None) None)))
 
   (repr :transparent)
-  (define-type (Parser :a) (Parser (Stream -> Result String (Tuple :a Stream))))
+  (define-type (Parser :a) (Parser (Port -> Result String (Tuple :a Port))))
 
   (define-instance (Functor Parser)
     (define (map f (Parser parse!))
@@ -215,11 +217,11 @@
           (Tuple (output:get-output-stream-string out)
                  (cell:read cell)))))))
 
-  (declare make-stream! (iter:Iterator Char -> Stream))
-  (define (make-stream! iter)
-    (%Stream (iter:next! iter) iter))
+  (declare make-port! (iter:Iterator Char -> Port))
+  (define (make-port! iter)
+    (%Port (iter:next! iter) iter))
 
-  (declare run! (Parser :a -> Stream -> Result String :a))
+  (declare run! (Parser :a -> Port -> Result String :a))
   (define (run! (Parser parse!) in)
     (>>= (parse! in)
          (fn ((Tuple x _))
