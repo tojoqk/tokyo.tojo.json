@@ -43,7 +43,7 @@
     (Number Double-Float)
     (String coalton:String)
     (Array (List JSON))
-    (Object (map:Map coalton:String JSON)))
+    (Object (List (Tuple coalton:String JSON))))
 
   (define-instance (Into Unit JSON)
     (define (into _) Null))
@@ -66,7 +66,7 @@
     (define (into x)
       (Array x)))
 
-  (define-instance (Into (map:Map coalton:String JSON) JSON)
+  (define-instance (Into (List (Tuple coalton:String JSON)) JSON)
     (define (into x)
       (Object x)))
 
@@ -109,7 +109,7 @@
          (into (Zipper (Array (append (reverse l) (Cons x r)))
                        c)))
         ((Zipper x (CrumbObject c k l r))
-         (into (Zipper (make-object (append (reverse l) (Cons (Tuple k x) r)))
+         (into (Zipper (Object (append (reverse l) (Cons (Tuple k x) r)))
                        c))))))
 
   ;; 
@@ -403,9 +403,6 @@
     Start-Parse-Object
     Continue-Parse-Object)
 
-  (define (make-object xs)
-    (Object (map:collect! (iter:into-iter xs))))
-
   (declare zipper-parser (parser:Parser Zipper))
   (define zipper-parser
     (let ((shallow-json-parser
@@ -423,7 +420,7 @@
                          (pure (into (Array Nil)))))
                     ((== c #\{)
                      (do parser:read-char
-                         (pure (into (Object map:empty)))))
+                         (pure (into (Object Nil)))))
                     (coalton:True
                      (fail-unexpected-char c))))))
           (declare deep-parser (Zipper -> State -> parser:Parser (Tuple Zipper (Optional State))))
@@ -519,7 +516,7 @@
                           (cond
                             ((== ch #\})
                              (do parser:read-char
-                                 (end-next (Zipper (make-object (append (reverse l) (Cons (Tuple xk x) r))) cr))))
+                                 (end-next (Zipper (Object (append (reverse l) (Cons (Tuple xk x) r))) cr))))
                             ((== ch #\,)
                              (do parser:read-char
                                  skip-whitespaces

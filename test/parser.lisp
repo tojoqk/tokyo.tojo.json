@@ -62,26 +62,19 @@
                                   (json:Number 3d0)))
                                 (json:Number 3d0))))))))
 
-(coalton-toplevel
-  (define (make-object pairs)
-    (json:Object
-     (foldr (fn ((Tuple k v) m) (map:insert-or-replace m k v))
-            map:empty
-            pairs))))
-
 (define-test parse-object-test ()
   (is (pipe "{\"hello\" : \"world\" }"
             json:parse
-            (== (Ok (make-object
+            (== (Ok (json:Object
                      (make-list (Tuple "hello" (json:String "world"))))))))
   (is (pipe "
 {\"test\" : 42, \"object\": { \"true\": true, \"false\" : false },
  \"array\": [10, 3.2, \"test\"], \"null\" : null }"
             json:parse
-            (== (Ok (make-object
+            (== (Ok (json:Object
                      (make-list (Tuple "test" (json:Number 42d0))
                                 (Tuple "object"
-                                       (make-object
+                                       (json:Object
                                         (make-list (Tuple "true" json:True)
                                                    (Tuple "false" json:False))))
                                 (Tuple "array"
