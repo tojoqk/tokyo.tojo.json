@@ -25,6 +25,9 @@
   (define (fail-unexpected-char c)
     (fail (message-with "Unexpected char" (singleton c))))
 
+  (define (fail-unexpected-string str)
+    (fail (message-with "Unexpected string" str)))
+
   (define (whitespace? c)
     (or (== c #\return)
         (== c #\tab)
@@ -57,7 +60,7 @@
          (fn (str)
            (if (< 0 (str:length str))
                (pure str)
-               (fail "Unexpected empty string")))))
+               (fail "Unexpected empty symbol")))))
 
   (declare take-until-parser ((Char -> Boolean) -> (parser:Parser coalton:String)))
   (define (take-until-parser end?)
@@ -80,21 +83,21 @@
     (do (word <- (non-empty-string word-parser))
         (if (== word "null")
             (pure Unit)
-            (fail (message-with "Unexpected string" word)))))
+            (fail-unexpected-string word))))
 
   (declare true-parser (parser:Parser Boolean))
   (define true-parser
     (do (word <- (non-empty-string word-parser))
         (if (== word "true")
             (pure coalton:True)
-            (fail (message-with "Unexpected empty string" word)))))
+            (fail-unexpected-string word))))
 
   (declare false-parser (parser:Parser Boolean))
   (define false-parser
     (do (word <- (non-empty-string word-parser))
         (if (== word "false")
             (pure coalton:False)
-            (fail (message-with "Unexpected string" word)))))
+            (fail-unexpected-string word))))
 
   (declare escape-char-map (map:Map Char Char))
   (define escape-char-map
@@ -132,7 +135,7 @@
                                           (str <- (take-parser 4))
                                         (match (>>= (parse-hex str) char:code-char)
                                           ((None)
-                                           (fail (message-with "Unexpected string" str)))
+                                           (fail-unexpected-string str))
                                           ((Some c)
                                            (pure (into (make-list c))))))))))
           (declare substring-parser (parser:Parser coalton:String))
@@ -159,7 +162,7 @@
       (fn (str)
         (if (< 0 (str:length str))
             (pure str)
-            (fail "Unexpected empty string"))))
+            (fail "Unexpected empty symbol"))))
     (>>= (take-until-parser (complement digit?))
          (fn (str)
            (parser:from-guard
@@ -191,19 +194,18 @@
           (integer-parser
             (fn (head)
               (match (str:parse-int head)
-                ((None) (fail (message-with "Unexpected string" head)))
+                ((None) (fail-unexpected-string head))
                 ((Some int)
                  (match (tryInto int)
                    ((Ok d) (pure d))
-                   ((Err _) (fail (message-with "Unexpected string" head))))))))
+                   ((Err _) (fail-unexpected-string head)))))))
 
           (declare float-parser (coalton:String -> coalton:String -> coalton:String -> parser:Parser Double-Float))
           (float-parser
             (fn (head fraction exponent)
               (match (parse-float head fraction exponent)
                 ((None)
-                 (fail (message-with "Unexpected string" (mconcat
-                                                          (make-list head "." fraction "e" exponent)))))
+                 (fail-unexpected-string (mconcat (make-list head "." fraction "e" exponent))))
                 ((Some float)
                  (pure float)))))
 
