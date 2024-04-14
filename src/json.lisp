@@ -336,7 +336,7 @@
                                               (do (digits <- digits-parser)
                                                   (if (== digits "0")
                                                       (pure digits)
-                                                      (fail (message-with "Unexpected string" digits)))))
+                                                      (fail-unexpected-string digits))))
                            (parser:guard-char digit1-9? digits-parser)))))
               (sign-parser main-parser)))
 
