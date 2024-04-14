@@ -30,13 +30,6 @@
 
 (named-readtables:in-readtable coalton:coalton)
 
-(cl:defmacro alt* (cl:&rest xs)
-  (cl:check-type xs cl:list)
-  (cl:if (cl:null xs)
-         'empty
-         `(alt ,(cl:first xs)
-               (alt* ,@(cl:rest xs)))))
-
 (coalton-toplevel
 
   ;;
