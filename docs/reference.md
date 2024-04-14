@@ -18,7 +18,7 @@ A representation of a JSON object.
 - <code><a href="#into-class">INTO</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a></code>
 - <code><a href="#into-class">INTO</a> <a href="#double-float-type">DOUBLE-FLOAT</a> <a href="#json-type">JSON</a></code>
 - <code><a href="#into-class">INTO</a> (<a href="#list-type">LIST</a> <a href="#json-type">JSON</a>) <a href="#json-type">JSON</a></code>
-- <code><a href="#into-class">INTO</a> (<a href="#list-type">LIST</a> (<a href="#tuple-type">TUPLE</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>)) <a href="#json-type">JSON</a></code>
+- <code><a href="#into-class">INTO</a> (<a href="#map-type">MAP</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>) <a href="#json-type">JSON</a></code>
 - <code><a href="#into-class">INTO</a> <a href="#json-type">JSON</a> <a href="#string-type">STRING</a></code>
 - <code><a href="#tryinto-class">TRYINTO</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a></code>
 
