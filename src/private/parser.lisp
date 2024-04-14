@@ -4,8 +4,6 @@
   (:local-nicknames
    (#:iter #:coalton-library/iterator)
    (#:cell #:coalton-library/cell)
-   (#:optional #:coalton-library/optional)
-   (#:map #:coalton-library/ord-map)
    (#:output #:tokyo.tojo.json/private/output-stream))
   (:export #:Port
            #:make-port!
