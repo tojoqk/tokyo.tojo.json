@@ -95,7 +95,7 @@
 
   (declare peek-char-or-eof (Parser (Optional Char)))
   (define peek-char-or-eof
-    (Parser (fn (in) (Ok (Tuple (peek in) in)))))
+    (Parser (fn (port) (Ok (Tuple (peek port) port)))))
 
   (declare peek-char (Parser Char))
   (define peek-char
@@ -107,25 +107,25 @@
   (declare read-char-or-eof (Parser (Optional Char)))
   (define read-char-or-eof
     (Parser
-     (fn (in)
-       (match (read! in)
-         ((Some (Tuple c in_))  (Ok (Tuple (Some c) in_)))
-         ((None) (Ok (Tuple None in)))))))
+     (fn (port)
+       (match (read! port)
+         ((Some (Tuple c port)) (Ok (Tuple (Some c) port)))
+         ((None) (Ok (Tuple None port)))))))
 
   (declare read-char (Parser Char))
   (define read-char
     (Parser
-     (fn (in)
-       (match (read! in)
-         ((Some (Tuple c in_)) (Ok (Tuple c in_)))
+     (fn (port)
+       (match (read! port)
+         ((Some (Tuple c port)) (Ok (Tuple c port)))
          ((None) (Err "Unexpected eof"))))))
 
   (declare take-until-string ((Char -> Boolean) -> Parser String))
   (define (take-until-string end?)
     (Parser
-     (fn (in)
+     (fn (port)
        (let ((out (output:make-string-output-stream))
-             (cell (cell:new in)))
+             (cell (cell:new port)))
          (while-let (Some (Tuple c next)) = (end-or-read! end? (cell:read cell))
                     (cell:write! cell next)
                     (output:write-char c out))
@@ -144,18 +144,18 @@
   (declare collect-while ((Char -> Optional (Parser :a)) -> Parser (List :a)))
   (define (collect-while f)
     (Parser
-     (fn (in)
+     (fn (port)
        (let result = (cell:new Nil))
-       (let in* = (cell:new in))
+       (let port* = (cell:new port))
        (loop
-         (match (peek (cell:read in*))
+         (match (peek (cell:read port*))
            ((Some c)
             (match (f c)
               ((None) (break))
               ((Some (Parser parse!))
-               (match (parse! (cell:read in*))
-                 ((Ok (Tuple elem in_))
-                  (cell:write! in* in_)
+               (match (parse! (cell:read port*))
+                 ((Ok (Tuple elem port))
+                  (cell:write! port* port)
                   (cell:write! result
                                (cons elem (cell:read result)))
                   Unit)
@@ -164,7 +164,7 @@
            ((None)
             (return (Err "Unexpected eof")))))
        (pure (Tuple (reverse (cell:read result))
-                    (cell:read in*))))))
+                    (cell:read port*))))))
 
   (declare fold-while ((:a -> :c -> Parser (Tuple :a (Optional :c))) -> :a -> :c -> Parser :a))
   (define (fold-while f acc state)
