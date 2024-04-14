@@ -26,7 +26,6 @@
            #:Object
 
            #:parse
-           #:parse!
            #:parse*))
 
 (in-package #:tokyo.tojo.json/json)
