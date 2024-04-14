@@ -37,7 +37,7 @@
   ;;
   ;; JSON Type
   ;;
-  
+
   (define-type JSON
     Null
     True False
@@ -113,7 +113,7 @@
          (into (Zipper (Object (append (reverse l) (Cons (Tuple k x) r)))
                        c))))))
 
-  ;; 
+  ;;
   ;; JSON Parser
   ;;
 
