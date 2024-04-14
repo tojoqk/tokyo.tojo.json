@@ -2,6 +2,13 @@
 
 (named-readtables:in-readtable coalton:coalton)
 
+(coalton-toplevel
+  (define (make-object pairs)
+    (json:Object
+     (foldr (fn ((Tuple k v) m) (map:insert-or-replace m k v))
+            map:empty
+            pairs))))
+
 (define-test render-null-test ()
   (matches "null"
       (into json:Null)))
@@ -58,23 +65,23 @@ newline
 
 (define-test render-object-test ()
   (matches "{}"
-      (into (json:Object Nil)))
+      (into (make-object Nil)))
   (matches "{\"one\":1.0\}"
-      (into (json:Object
+      (into (make-object
              (make-list (Tuple "one" (json:Number 1d0))))))
   (is (let ((obj
-              (json:Object (make-list (Tuple "one" (json:Number 1d0))
+              (make-object (make-list (Tuple "one" (json:Number 1d0))
                                       (Tuple "two" (json:Number 2d0))
                                       (Tuple "three" (json:Number 3d0))))))
         (== (json:parse (into obj)) (pure obj))))
   (is (let ((obj
-              (json:Object
+              (make-object
                (make-list (Tuple "one" (json:Number 1d0))
                           (Tuple "array" (json:Array (make-list (json:Number 1)
                                                                 json:True
                                                                 json:False
                                                                 json:Null)))
-                          (Tuple "object" (json:Object (make-list
+                          (Tuple "object" (make-object (make-list
                                                         (Tuple "a" (json:String "A")))))
                           (Tuple "three" (json:Number 3d0))))))
         (== (json:parse (into obj)) (pure obj)))))

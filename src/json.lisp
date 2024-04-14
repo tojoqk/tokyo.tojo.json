@@ -45,7 +45,7 @@
     (Number Double-Float)
     (String coalton:String)
     (Array (List JSON))
-    (Object (List (Tuple coalton:String JSON))))
+    (Object (map:Map coalton:String JSON)))
 
   (define-instance (Into Unit JSON)
     (define (into _) Null))
@@ -68,7 +68,7 @@
     (define (into x)
       (Array x)))
 
-  (define-instance (Into (List (Tuple coalton:String JSON)) JSON)
+  (define-instance (Into (map:Map coalton:String JSON) JSON)
     (define (into x)
       (Object x)))
 
@@ -103,14 +103,15 @@
     (Zipper x CrumbTop))
 
   (define (from-zipper z)
-    (match z
-      ((Zipper x (CrumbTop)) x)
-      ((Zipper x (CrumbArray c l r))
-       (from-zipper (Zipper (Array (append (reverse l) (Cons x r)))
-                            c)))
-      ((Zipper x (CrumbObject c k l r))
-       (from-zipper (Zipper (Object (append (reverse l) (Cons (Tuple k x) r)))
-                            c)))))
+    (define (into z)
+      (match z
+        ((Zipper x (CrumbTop)) x)
+        ((Zipper x (CrumbArray c l r))
+         (into (Zipper (Array (append (reverse l) (Cons x r)))
+                       c)))
+        ((Zipper x (CrumbObject c k l r))
+         (into (Zipper (make-object (append (reverse l) (Cons (Tuple k x) r)))
+                       c))))))
 
   ;;
   ;; JSON Parser
@@ -395,6 +396,9 @@
     Start-Parse-Object
     Continue-Parse-Object)
 
+  (define (make-object xs)
+    (Object (map:collect! (iter:into-iter xs))))
+
   (declare zipper-parser (parser:Parser Zipper))
   (define zipper-parser
     (let ((shallow-json-parser
@@ -412,7 +416,7 @@
                          (pure (into (Array Nil)))))
                     ((== c #\{)
                      (do parser:read-char
-                         (pure (into (Object Nil)))))
+                         (pure (into (Object map:empty)))))
                     (coalton:True
                      (fail-unexpected-char c))))))
           (declare deep-parser (Zipper -> State -> parser:Parser (Tuple Zipper (Optional State))))
@@ -508,7 +512,7 @@
                           (cond
                             ((== ch #\})
                              (do parser:read-char
-                                 (end-next (Zipper (Object (append (reverse l) (Cons (Tuple xk x) r))) cr))))
+                                 (end-next (Zipper (make-object (append (reverse l) (Cons (Tuple xk x) r))) cr))))
                             ((== ch #\,)
                              (do parser:read-char
                                  skip-whitespaces
