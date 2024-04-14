@@ -47,30 +47,10 @@
     (Array (List JSON))
     (Object (map:Map coalton:String JSON)))
 
-  (define-instance (Into Unit JSON)
-    (define (into _) Null))
-
-  (define-instance (Into Boolean JSON)
-    (define (into b)
-      (match b
-        ((coalton:True) True)
-        ((coalton:False) False))))
-
-  (define-instance (Into coalton:String JSON)
-    (define (into x)
-      (String x)))
-
-  (define-instance (Into Double-Float JSON)
-    (define (into x)
-      (Number x)))
-
-  (define-instance (Into (List JSON) JSON)
-    (define (into x)
-      (Array x)))
-
-  (define-instance (Into (map:Map coalton:String JSON) JSON)
-    (define (into x)
-      (Object x)))
+  (define (boolean-to-json b)
+    (match b
+      ((coalton:True) True)
+      ((coalton:False) False)))
 
   (define-instance (Eq JSON)
     (define (== a b)
@@ -401,23 +381,22 @@
   (declare zipper-parser (parser:Parser Zipper))
   (define zipper-parser
     (let ((shallow-json-parser
-            (let ((atom-parser (fn (parser) (map into parser))))
-              (do skip-whitespaces
-                  (c <- parser:peek-char)
-                  (cond
-                    ((== c #\n) (atom-parser null-parser))
-                    ((== c #\t) (atom-parser true-parser))
-                    ((== c #\f) (atom-parser false-parser))
-                    ((or (digit? c) (== c #\-)) (atom-parser number-parser))
-                    ((== c #\") (atom-parser string-parser))
-                    ((== c #\[)
-                     (do parser:read-char
-                         (pure (into (Array Nil)))))
-                    ((== c #\{)
-                     (do parser:read-char
-                         (pure (into (Object map:empty)))))
-                    (coalton:True
-                     (fail-unexpected-char c))))))
+            (do skip-whitespaces
+                (c <- parser:peek-char)
+                (cond
+                  ((== c #\n) (>> null-parser (pure Null)))
+                  ((== c #\t) (map boolean-to-json true-parser))
+                  ((== c #\f) (map boolean-to-json false-parser))
+                  ((or (digit? c) (== c #\-)) (map Number number-parser))
+                  ((== c #\") (map String string-parser))
+                  ((== c #\[)
+                   (do parser:read-char
+                       (pure (into (Array Nil)))))
+                  ((== c #\{)
+                   (do parser:read-char
+                       (pure (into (Object map:empty)))))
+                  (coalton:True
+                   (fail-unexpected-char c)))))
           (declare deep-parser (Zipper -> State -> parser:Parser (Tuple Zipper (Optional State))))
           (deep-parser
             (fn (z state)
