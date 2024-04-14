@@ -8,11 +8,7 @@
   :pathname "src/"
   :components ((:file "private/output-stream")
                (:file "private/parser")
-               (:file "json/package")
-               (:file "json/json")
-               (:file "json/zipper")
-               (:file "json/renderer")
-               (:file "json/parser"))
+               (:file "json"))
   :in-order-to ((test-op (test-op "tokyo.tojo.json/test"))))
 
 (defsystem #:tokyo.tojo.json/test
