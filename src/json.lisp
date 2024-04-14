@@ -26,7 +26,7 @@
            #:Object
 
            #:parse
-           #:parse*))
+           #:parse!))
 
 (in-package #:tokyo.tojo.json)
 
@@ -538,19 +538,15 @@
   (define json-parser
     (map from-zipper zipper-parser))
 
-  (declare parse! (iter:Iterator Char -> (Result coalton:String JSON)))
-  (define (parse! iter)
-    (map fst (parser:run! json-parser (port:make! iter))))
-
   (declare parse (coalton:String -> (Result coalton:String JSON)))
   (define (parse str)
     "Parse the JSON string `STR`.
 
-Returns a JSON type object if successful, otherwise returns an error message."    
-    (parse! (iter:into-iter str)))
+Returns a JSON type object if successful, otherwise returns an error message."
+    (map fst (parser:run! json-parser (port:make! (iter:into-iter str)))))
 
-  (declare parse* (iter:Iterator Char -> Iterator (Result coalton:String JSON)))
-  (define (parse* iter)
+  (declare parse! (iter:Iterator Char -> Iterator (Result coalton:String JSON)))
+  (define (parse! iter)
     "Create an iterator of JSON objects from the character iterator `ITER` containing JSON data."
     (let port* = (cell:new (port:make! iter)))
     (let parser = (do skip-whitespaces
