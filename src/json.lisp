@@ -245,13 +245,13 @@
           (write-escaped-char-parser
             (do (ch <- parser:read-char)
                 (cond ((== ch #\u)
-                       (do
-                         (str <- (take-parser 4))
-                         (match (>>= (parse-hex str) char:code-char)
-                           ((None)
-                            (fail-unexpected-string str))
-                           ((Some ch)
-                            (parser:write-char ch)))))
+                       (do (str <- (take-parser 4))
+                           (match (>>= (parse-hex str)
+                                       char:code-char)
+                             ((None)
+                              (fail-unexpected-string str))
+                             ((Some ch)
+                              (parser:write-char ch)))))
                       (coalton:True
                        (match (map:lookup escape-char-map ch)
                          ((Some ch)
