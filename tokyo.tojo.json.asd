@@ -3,7 +3,7 @@
   :author "Masaya Tojo"
   :license  "MIT"
   :version "0.0.0"
-  :depends-on (#:coalton)
+  :depends-on (#:coalton #:alexandria)
   :serial t
   :pathname "src/"
   :components ((:file "private/output-stream")

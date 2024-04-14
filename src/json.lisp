@@ -155,15 +155,14 @@
 
   (declare parse-hex (coalton:String -> (Optional UFix)))
   (define (parse-hex str)
-    (>>= (lisp (Optional Integer) (str)
-           (cl:handler-case
-               (cl:let ((value (cl:parse-integer str :radix 16)))
-                 (cl:check-type value cl:integer)
-                 (coalton (Some (lisp Integer () value))))
-             (cl:error (e)
-               (cl:declare (cl:ignore e))
-               (coalton None))))
-         (.> tryInto as-optional)))
+    (let m = (the UFix coalton-library/math:maxbound))
+    (lisp (Optional UFix) (str m)
+      (alexandria:if-let (n (cl:ignore-errors
+                             (cl:parse-integer str :radix 16)))
+        (cl:if (cl:<= n m)
+               (Some n)
+               None)
+        None)))
 
   (define (non-empty-string parser)
     (>>= parser
