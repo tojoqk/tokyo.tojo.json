@@ -567,20 +567,17 @@
     (define tryInto parse))
 
   ;;
-  ;; Renderer
+  ;; JSON to String conversion
   ;;
 
   (define-instance (Into JSON coalton:String)
-    (define (into x) (render x)))
+    (define (into x)
+      (let out = (output:make-string-output-stream))
+      (write-json x out)
+      (output:get-output-stream-string out)))
 
-  (declare render (JSON -> Coalton:String))
-  (define (render x)
-    (let out = (output:make-string-output-stream))
-    (render_ x out)
-    (output:get-output-stream-string out))
-
-  (declare render_ (JSON -> output:Stream -> Unit))
-  (define (render_ x out)
+  (declare write-json (JSON -> output:Stream -> Unit))
+  (define (write-json x out)
     (match x
       ((Null) (output:write-string "null" out))
       ((True) (output:write-string "true" out))
@@ -591,15 +588,15 @@
            (cl:format out "~f" n)
            Unit)))
       ((String s)
-       (render-string s out))
+       (write-json-string s out))
       ((Array l)
        (output:write-char #\[ out)
        (match l
          ((Cons h t)
-          (render_ h out)
+          (write-json h out)
           (for x in t
                (output:write-char #\, out)
-               (render_ x out)))
+               (write-json x out)))
          ((Nil) Unit))
        (output:write-char #\] out))
       ((Object m)
@@ -607,19 +604,19 @@
        (let iter = (iter:into-iter m))
        (match (iter:next! iter)
          ((Some (Tuple k v))
-          (render-string k out)
+          (write-json-string k out)
           (output:write-char #\: out)
-          (render_ v out)
+          (write-json v out)
           (for (Tuple k v) in iter
                (output:write-char #\, out)
-               (render-string k out)
+               (write-json-string k out)
                (output:write-char #\: out)
-               (render_ v out)))
+               (write-json v out)))
          ((None) Unit))
        (output:write-char #\} out))))
 
-  (declare render-string (coalton:String -> output:Stream -> Unit))
-  (define (render-string x out)
+  (declare write-json-string (coalton:String -> output:Stream -> Unit))
+  (define (write-json-string x out)
     (output:write-char #\" out)
     (for c in x
          (match c
