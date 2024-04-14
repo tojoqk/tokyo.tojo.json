@@ -13,7 +13,8 @@
            #:take-until-string
            #:run!
            #:collect-while
-           #:fold-while))
+           #:fold-while
+           #:do-while))
 
 (in-package #:tokyo.tojo.json/private/parser)
 
@@ -143,4 +144,14 @@
                Unit)
               ((None) (break))))
            ((Err e) (return (Err e)))))
-       (Ok (Tuple (cell:read acc*) (cell:read port*)))))))
+       (Ok (Tuple (cell:read acc*) (cell:read port*))))))
+
+  (declare do-while (Parser Boolean -> Parser Unit))
+  (define (do-while p)
+    (fold-while (fn ((Unit) (Unit))
+                  (do (b <- p)
+                      (if b
+                          (pure (Tuple Unit (Some Unit)))
+                          (pure (Tuple Unit None)))))
+                Unit
+                Unit)))

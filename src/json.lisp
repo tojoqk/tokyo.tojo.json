@@ -142,12 +142,14 @@
 
   (declare skip-whitespaces (parser:Parser Unit))
   (define skip-whitespaces
-    (>> (parser:collect-while
-         (fn (c)
-           (if (whitespace? c)
-               (Some parser:read-char)
-               None)))
-        (pure Unit)))
+    (parser:do-while (do (opt-ch <- parser:peek-char-or-eof)
+                         (match opt-ch
+                           ((Some ch)
+                            (if (whitespace? ch)
+                                (do parser:read-char
+                                    (pure coalton:True))
+                                (pure coalton:False)))
+                           ((None) (pure coalton:False))))))
 
   (declare parse-hex (coalton:String -> (Optional UFix)))
   (define (parse-hex str)
