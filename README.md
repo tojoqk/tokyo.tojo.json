@@ -11,7 +11,7 @@ https://github.com/coalton-lang/coalton
 Next, place json-parser in your local repository (`~/common-lisp`, etc.).
 
 ```shell:~/common-lisp
-git clone https://github.com/tojoqk/json.git
+git clone https://github.com/tojoqk/json.git tokyo.tojo.json
 ```
 
 If you are using Quicklisp, you can load the system with the following.
