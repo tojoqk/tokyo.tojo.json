@@ -103,15 +103,14 @@
     (Zipper x CrumbTop))
 
   (define (from-zipper z)
-    (define (into z)
-      (match z
-        ((Zipper x (CrumbTop)) x)
-        ((Zipper x (CrumbArray c l r))
-         (into (Zipper (Array (append (reverse l) (Cons x r)))
-                       c)))
-        ((Zipper x (CrumbObject c k l r))
-         (into (Zipper (make-object (append (reverse l) (Cons (Tuple k x) r)))
-                       c))))))
+    (match z
+      ((Zipper x (CrumbTop)) x)
+      ((Zipper x (CrumbArray c l r))
+       (from-zipper (Zipper (Array (append (reverse l) (Cons x r)))
+                            c)))
+      ((Zipper x (CrumbObject c k l r))
+       (from-zipper (Zipper (make-object (append (reverse l) (Cons (Tuple k x) r)))
+                            c)))))
 
   ;;
   ;; JSON Parser
