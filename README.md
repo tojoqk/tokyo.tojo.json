@@ -31,7 +31,7 @@ See [Reference](./docs/reference.md) file.
   (:use #:coalton
         #:coalton-prelude)
   (:local-nicknames
-   (#:json #:tokyo.tojo.json/json)
+   (#:json #:tokyo.tojo.json)
    (#:map #:coalton-library/ord-map)))
 
 (in-package #:json-parser-example)

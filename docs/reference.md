@@ -1,6 +1,6 @@
-# Package `tokyo.tojo.json/json`<a name="tokyo.tojo.json/json-package"></a>
+# Package `tokyo.tojo.json`<a name="tokyo.tojo.json-package"></a>
 
-## [json.lisp](https://github.com/tojoqk/json/tree/main/src/json.lisp) <a name="tokyo.tojo.json/json-json-lisp-file"></a>
+## [json.lisp](https://github.com/tojoqk/json/tree/main/src/json.lisp) <a name="tokyo.tojo.json-json-lisp-file"></a>
 
 ### Types
 

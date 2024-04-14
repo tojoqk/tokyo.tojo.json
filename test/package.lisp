@@ -1,7 +1,7 @@
 (defpackage #:tokyo.tojo.json/test
   (:use #:coalton-testing)
   (:local-nicknames
-   (#:json #:tokyo.tojo.json/json))
+   (#:json #:tokyo.tojo.json))
   (:export #:run-tests))
 
 (in-package #:tokyo.tojo.json/test)

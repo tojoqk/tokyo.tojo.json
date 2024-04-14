@@ -1,4 +1,4 @@
-(defpackage #:tokyo.tojo.json/json
+(defpackage #:tokyo.tojo.json
   (:use #:coalton
         #:coalton-prelude)
   (:shadow #:String
@@ -28,7 +28,7 @@
            #:parse
            #:parse*))
 
-(in-package #:tokyo.tojo.json/json)
+(in-package #:tokyo.tojo.json)
 
 (named-readtables:in-readtable coalton:coalton)
 
