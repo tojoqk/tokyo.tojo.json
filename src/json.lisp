@@ -256,15 +256,20 @@
                            escaped-char-parser))
                       (coalton:True
                        (take-until-parser (disjoin (== #\\) (== #\"))))))))
-      (>> parser:read-char
-          (>>= (parser:collect-while
-                (fn (c)
-                  (if (== c #\")
-                      None
-                      (Some substring-parser))))
-               (fn (lst)
-                 (>> parser:read-char
-                     (pure (mconcat lst))))))))
+      (do parser:read-char
+          (map output:get-output-stream-string
+               (parser:fold-while
+                (fn (stream (Unit))
+                  (do (ch <- parser:peek-char)
+                      (if (== ch #\")
+                          (do parser:read-char
+                              (pure (Tuple stream None)))
+                          (do (substring <- substring-parser)
+                              (progn
+                                (output:write-string substring stream)
+                                (pure (Tuple stream (Some Unit))))))))
+                (output:make-string-output-stream)
+                Unit)))))
 
   (declare digits-parser (parser:Parser coalton:String))
   (define digits-parser
