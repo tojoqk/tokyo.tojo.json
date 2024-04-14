@@ -44,16 +44,13 @@
        (let c_ = (iter:next! iter))
        (Some (Tuple c (%Port c_ iter))))))
 
-  (declare end-or-read! ((Char -> Boolean) -> Port -> Optional (Tuple Char Port)))
-  (define (end-or-read! end? (%Port opt iter))
-    (match opt
-      ((Some c)
-       (if (end? c)
-           None
-           (progn
-             (let c_ = (iter:next! iter))
-             (Some (Tuple c (%Port c_ iter))))))
-      ((None) None)))
+  (declare peek-or-read! ((char -> Boolean) -> Port -> Optional (Tuple Char Port)))
+  (define (peek-or-read! read? (%Port opt iter))
+    (do (ch <- opt)
+        (cond ((read? ch)
+               (let next-ch = (iter:next! iter))
+               (Some (Tuple ch (%Port next-ch iter))))
+              (True None))))
 
   ;;
   ;; Parser
@@ -126,7 +123,7 @@
      (fn (port)
        (let ((out (output:make-string-output-stream))
              (cell (cell:new port)))
-         (while-let (Some (Tuple c next)) = (end-or-read! end? (cell:read cell))
+         (while-let (Some (Tuple c next)) = (peek-or-read! (complement end?) (cell:read cell))
                     (cell:write! cell next)
                     (output:write-char c out))
          (Ok
