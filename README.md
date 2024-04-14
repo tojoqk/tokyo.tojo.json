@@ -20,7 +20,11 @@ If you are using Quicklisp, you can load the system with the following.
 (ql:quickload :tokyo.tojo.json)
 ```
 
-## Examples
+## Usage
+
+See [Reference](./docs/reference.md) file.
+
+### Examples
 
 ```lisp
 (defpackage #:json-parser-example
