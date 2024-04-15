@@ -552,32 +552,35 @@ Returns a JSON type object if successful, otherwise returns an error message."
 
 Includes a one-character lookahead process when called."
     (let r-port = (port:make! iter))
+    (let done?* = (cell:new coalton:False))
     (match r-port
       ((Err e)
        (iter:new (fn ()
-                   (let ((declare port-error-to-parser-error (port:Error :e -> parser:Error :e))
-                         (port-error-to-parser-error into))
-                     (Some (Err (parser-error-to-error (port-error-to-parser-error e))))))))
+                   (if (cell:read done?*)
+                       None
+                       (let ((declare port-error-to-parser-error (port:Error :e -> parser:Error :e))
+                             (port-error-to-parser-error into))
+                         (cell:write! done?* coalton:True)
+                         (Some (Err (parser-error-to-error (port-error-to-parser-error e)))))))))
       ((Ok port)
        (let port* = (cell:new port))
-       (let end?* = (cell:new coalton:False))
        (let parser = (do skip-whitespaces
                          (opt-ch <- parser:peek-char-or-eof)
                          (match opt-ch
                            ((Some _) (map Some json-parser))
                            ((None) (pure None)))))
        (iter:new (fn ()
-                   (if (cell:read end?*)
+                   (if (cell:read done?*)
                        None
                        (match (parser:run! parser (cell:read port*))
                          ((Ok (Tuple (Some x) port))
                           (cell:write! port* port)
                           (Some (Ok x)))
                          ((Ok (Tuple (None) _))
-                          (cell:write! end?* coalton:True)
+                          (cell:write! done?* coalton:True)
                           None)
                          ((Err e)
-                          (cell:write! end?* coalton:True)
+                          (cell:write! done?* coalton:True)
                           (Some (Err (parser-error-to-error e)))))))))))
 
   (define-instance (TryInto coalton:String JSON)
