@@ -147,4 +147,9 @@
 
  \"hello\"
 
-"))))))))
+")))))))
+
+  (matches (Err (json:ReadError (Unit)))
+      (the (Result (json:Error Unit) (List json:JSON))
+           (sequence (iter:collect! (json:parse! (iter:into-iter (make-list (Err Unit))))))))
+  )
