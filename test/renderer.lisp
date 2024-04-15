@@ -73,7 +73,7 @@ newline
               (make-object (make-list (Tuple "one" (json:Number 1d0))
                                       (Tuple "two" (json:Number 2d0))
                                       (Tuple "three" (json:Number 3d0))))))
-        (== (json:parse (into obj)) (pure obj))))
+        (== (tryInto (the String (into obj))) (pure obj))))
   (is (let ((obj
               (make-object
                (make-list (Tuple "one" (json:Number 1d0))
@@ -84,4 +84,4 @@ newline
                           (Tuple "object" (make-object (make-list
                                                         (Tuple "a" (json:String "A")))))
                           (Tuple "three" (json:Number 3d0))))))
-        (== (json:parse (into obj)) (pure obj)))))
+        (== (tryInto (the String (into obj))) (pure obj)))))
