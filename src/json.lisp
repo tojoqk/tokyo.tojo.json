@@ -3,7 +3,8 @@
         #:coalton-prelude)
   (:shadow #:String
            #:True
-           #:False)
+           #:False
+           #:Error)
   (:local-nicknames
    (#:map #:coalton-library/ord-map)
    (#:iter #:coalton-library/iterator)
@@ -13,6 +14,7 @@
    (#:list #:coalton-library/list)
    (#:result #:coalton-library/result)
    (#:cell #:coalton-library/cell)
+   (#:builtin #:coalton-library/builtin)
    (#:output #:tokyo.tojo.json/private/output-stream)
    (#:port #:tokyo.tojo.json/private/port)
    (#:parser #:tokyo.tojo.json/private/parser))
@@ -25,7 +27,10 @@
            #:Array
            #:Object
 
-           #:parse!))
+           #:parse!
+           #:Error
+           #:Message
+           #:ReadError))
 
 (in-package #:tokyo.tojo.json)
 
@@ -119,7 +124,7 @@
         (== c #\newline)
         (== c #\space)))
 
-  (declare skip-whitespaces (parser:Parser Unit))
+  (declare skip-whitespaces (parser:Parser :e Unit))
   (define skip-whitespaces
     (parser:do-while (do (opt-ch <- parser:peek-char-or-eof)
                          (match opt-ch
@@ -167,27 +172,27 @@
         (== c #\,)
         (== c #\")))
 
-  (declare word-parser (parser:Parser coalton:String))
+  (declare word-parser (parser:Parser :e coalton:String))
   (define word-parser
     (do parser:push-new-buffer
         (write-take-until sep?)
         parser:pop-string))
 
-  (declare null-parser (parser:Parser Unit))
+  (declare null-parser (parser:Parser :e Unit))
   (define null-parser
     (do (word <- (non-empty-string word-parser))
         (if (== word "null")
             (pure Unit)
             (fail-unexpected-string word))))
 
-  (declare true-parser (parser:Parser Boolean))
+  (declare true-parser (parser:Parser :e Boolean))
   (define true-parser
     (do (word <- (non-empty-string word-parser))
         (if (== word "true")
             (pure coalton:True)
             (fail-unexpected-string word))))
 
-  (declare false-parser (parser:Parser Boolean))
+  (declare false-parser (parser:Parser :e Boolean))
   (define false-parser
     (do (word <- (non-empty-string word-parser))
         (if (== word "false")
@@ -212,13 +217,13 @@
   (define (escape-char? c)
     (optional:some? (map:lookup escape-char-map c)))
 
-  (declare take-parser (UFix -> (parser:Parser coalton:String)))
+  (declare take-parser (UFix -> (parser:Parser :e coalton:String)))
   (define (take-parser n)
     (map into (sequence (list:repeat n parser:peek-char))))
 
-  (declare string-parser (parser:Parser coalton:String))
+  (declare string-parser (parser:Parser :e coalton:String))
   (define string-parser
-    (let ((declare write-escaped-char-parser (parser:Parser Unit))
+    (let ((declare write-escaped-char-parser (parser:Parser :e Unit))
           (write-escaped-char-parser
             (do (ch <- parser:read-char)
                 (cond ((== ch #\u)
@@ -235,7 +240,7 @@
                           (parser:write-char ch))
                          ((None)
                           (fail-unexpected-char ch)))))))
-          (declare write-substring (parser:Parser Unit))
+          (declare write-substring (parser:Parser :e Unit))
           (write-substring
             (do (ch <- parser:peek-char)
                 (cond ((== ch #\\)
@@ -253,7 +258,7 @@
                                        (pure coalton:True)))))
           parser:pop-string)))
 
-  (declare digits-parser (parser:Parser coalton:String))
+  (declare digits-parser (parser:Parser :e coalton:String))
   (define digits-parser
     (let length>0-check =
       (fn (str)
@@ -287,9 +292,9 @@
           (cl:declare (cl:ignore e))
           (coalton None)))))
 
-  (declare number-parser (parser:Parser Double-Float))
+  (declare number-parser (parser:Parser :e Double-Float))
   (define number-parser
-    (let ((declare float-parser (coalton:String -> coalton:String -> coalton:String -> parser:Parser Double-Float))
+    (let ((declare float-parser (coalton:String -> coalton:String -> coalton:String -> parser:Parser :e Double-Float))
           (float-parser
             (fn (head fraction exponent)
               (do parser:push-new-buffer
@@ -303,7 +308,7 @@
                     ((Some float) (pure float))
                     ((None) (fail-unexpected-string (mconcat (make-list head "." fraction "e" exponent))))))))
 
-          (declare head-parser (parser:Parser coalton:String))
+          (declare head-parser (parser:Parser :e coalton:String))
           (head-parser
             (let ((sign-parser
                     (fn (continue-parser)
@@ -327,7 +332,7 @@
                            (fail-unexpected-char ch))))))
               (sign-parser main-parser)))
 
-          (declare fraction-parser (coalton:String -> (parser:Parser Double-Float)))
+          (declare fraction-parser (coalton:String -> (parser:Parser :e Double-Float)))
           (fraction-parser
             (fn (head)
               (do parser:read-char
@@ -341,7 +346,7 @@
                            (coalton:True
                             (fail-unexpected-char ch))))))))
 
-          (declare exponent-parser (coalton:String -> coalton:String -> (parser:Parser Double-Float)))
+          (declare exponent-parser (coalton:String -> coalton:String -> (parser:Parser :e Double-Float)))
           (exponent-parser
             (fn (head fraction)
               (do parser:read-char
@@ -377,7 +382,7 @@
   (define (make-object xs)
     (Object (map:collect! (iter:into-iter xs))))
 
-  (declare zipper-parser (parser:Parser Zipper))
+  (declare zipper-parser (parser:Parser :e Zipper))
   (define zipper-parser
     (let ((shallow-json-parser
             (do skip-whitespaces
@@ -396,10 +401,10 @@
                        (pure (into (Object map:empty)))))
                   (coalton:True
                    (fail-unexpected-char c)))))
-          (declare deep-parser (Zipper -> State -> parser:Parser (Tuple Zipper (Optional State))))
+          (declare deep-parser (Zipper -> State -> parser:Parser :e (Tuple Zipper (Optional State))))
           (deep-parser
             (fn (z state)
-              (let ((declare key-value-parser (parser:Parser (Tuple coalton:String JSON)))
+              (let ((declare key-value-parser (parser:Parser :e (Tuple coalton:String JSON)))
                     (key-value-parser
                       (do (key <- string-parser)
                           skip-whitespaces
@@ -467,7 +472,7 @@
                                  (comma-next j (Zipper j (CrumbArray cr (Cons x l) r)) Continue-Parse-Array)))
                             (coalton:True
                              (fail-unexpected-char ch)))))
-                     (_ (error "zipper-parser: program error (Continue-Parse-Array)"))))
+                     (_ (builtin:error "zipper-parser: program error (Continue-Parse-Array)"))))
                   ((Start-Parse-Object)
                    (do skip-whitespaces
                        (ch <- parser:peek-char)
@@ -499,7 +504,7 @@
                                              Continue-Parse-Object)))
                             (coalton:True
                              (fail-unexpected-char ch)))))
-                     (_ (error "zipper-parser: program error (Continue-Parse-Object)")))))))))
+                     (_ (builtin:error "zipper-parser: program error (Continue-Parse-Object)")))))))))
       (do (z <- (map to-zipper shallow-json-parser))
           (match z
             ((Zipper (Null) _) (pure z))
@@ -512,7 +517,7 @@
             ((Zipper (Object _) _)
              (parser:fold-while deep-parser z Start-Parse-Object))))))
 
-  (declare json-parser (parser:Parser JSON))
+  (declare json-parser (parser:Parser :e JSON))
   (define json-parser
     (map from-zipper zipper-parser))
 
@@ -521,26 +526,52 @@
     "Parse the JSON string `STR`.
 
 Returns a JSON type object if successful, otherwise returns an error message."
-    (map fst (parser:run! json-parser (port:make! (iter:into-iter str)))))
+    (map fst
+         (result:map-err (fn (e)
+                           (match e
+                             ((parser:Message m) m)
+                             ((parser:ReadError (Unit)) (builtin:error "parse: program error"))))
+                         (match (port:make! (map pure (iter:into-iter str)))
+                           ((Ok port)
+                            (parser:run! json-parser port))
+                           ((Err (port:ReadError (Unit)))
+                            (builtin:error "parse: program error"))))))
 
-  (declare parse! (iter:Iterator Char -> Iterator (Result coalton:String JSON)))
+  (define-type (Error :e)
+    (Message coalton:String)
+    (ReadError :e))
+
+  (define (parser-error-to-error e)
+    (match e
+      ((parser:Message m) (Message m))
+      ((parser:ReadError e) (ReadError e))))
+
+  (declare parse! (iter:Iterator (Result :e Char) -> Iterator (Result (Error :e) JSON)))
   (define (parse! iter)
     "Create an iterator for JSON objects from the character iterator ITER, which contains JSON data.
 
 Includes a one-character lookahead process when called."
-    (let port* = (cell:new (port:make! iter)))
-    (let parser = (do skip-whitespaces
-                      (opt-ch <- parser:peek-char-or-eof)
-                      (match opt-ch
-                        ((Some _) (map Some json-parser))
-                        ((None) (pure None)))))
-    (iter:new (fn ()
-                (match (parser:run! parser (cell:read port*))
-                  ((Ok (Tuple (Some x) port))
-                   (cell:write! port* port)
-                   (Some (Ok x)))
-                  ((Ok (Tuple (None) _)) None)
-                  ((Err e) (Some (Err e)))))))
+    (let r-port = (port:make! iter))
+    (match r-port
+      ((Err e)
+       (iter:new (fn ()
+                   (let ((declare port-error-to-parser-error (port:Error :e -> parser:Error :e))
+                         (port-error-to-parser-error into))
+                     (Some (Err (parser-error-to-error (port-error-to-parser-error e))))))))
+      ((Ok port)
+       (let port* = (cell:new port))
+       (let parser = (do skip-whitespaces
+                         (opt-ch <- parser:peek-char-or-eof)
+                         (match opt-ch
+                           ((Some _) (map Some json-parser))
+                           ((None) (pure None)))))
+       (iter:new (fn ()
+                   (match (parser:run! parser (cell:read port*))
+                     ((Ok (Tuple (Some x) port))
+                      (cell:write! port* port)
+                      (Some (Ok x)))
+                     ((Ok (Tuple (None) _)) None)
+                     ((Err e) (Some (Err (parser-error-to-error e))))))))))
 
   (define-instance (TryInto coalton:String JSON)
     (define tryInto parse))

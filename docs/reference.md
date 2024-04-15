@@ -4,6 +4,18 @@
 
 ### Types
 
+#### <code>ERROR :A</code> <sup><sub>[TYPE]</sub></sup><a name="error-type"></a>
+
+<details>
+<summary>Instances</summary>
+
+- <code><a href="#runtimerepr-class">RUNTIMEREPR</a> (<a href="#error-type">ERROR</a> :A)</code>
+
+</details>
+
+
+***
+
 #### <code>JSON</code> <sup><sub>[TYPE]</sub></sup><a name="json-type"></a>
 
 A representation of a JSON object.
@@ -24,7 +36,7 @@ A representation of a JSON object.
 ### Values
 
 #### <code>(PARSE! ITER)</code> <sup><sub>FUNCTION</sub></sup><a name="parse!-value"></a>
-<code>((<a href="#iterator-type">ITERATOR</a> <a href="#char-type">CHAR</a>) &rarr; (<a href="#iterator-type">ITERATOR</a> (<a href="#result-type">RESULT</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>)))</code>
+<code>&forall; :A. ((<a href="#iterator-type">ITERATOR</a> (<a href="#result-type">RESULT</a> :A <a href="#char-type">CHAR</a>)) &rarr; (<a href="#iterator-type">ITERATOR</a> (<a href="#result-type">RESULT</a> (<a href="#error-type">ERROR</a> :A) <a href="#json-type">JSON</a>)))</code>
 
 Create an iterator for JSON objects from the character iterator ITER, which contains JSON data.
 

@@ -124,25 +124,27 @@
                      (Cons (json:Number 42d0)
                            (Cons (json:String "hello")
                                  (Nil)))))
-      (sequence (iter:collect! (json:parse! (iter:into-iter "[1, 2, 3] 42
-
- \"hello\"
-
-")))))
-
-  (matches (Some (Ok (json:Array (Cons (json:Number 1d0)
-                                       (Cons (json:Number 2d0)
-                                             (Cons (json:Number 3d0) (Nil)))))))
-      (head (iter:collect! (json:parse! (iter:into-iter "[1, 2, 3] 42 invalid
-
- \"hello\"
-
-")))))
-
-  (matches (Err _)
-      (the (Result String (List json:JSON))
-           (sequence (iter:collect! (json:parse! (iter:into-iter "[1, 2, 3] 42 invalid
+      (the (Result (json:Error Unit) (List json:JSON))
+           (sequence (iter:collect! (json:parse! (map pure (iter:into-iter "[1, 2, 3] 42
 
  \"hello\"
 
 ")))))))
+
+  (matches (Some (Ok (json:Array (Cons (json:Number 1d0)
+                                       (Cons (json:Number 2d0)
+                                             (Cons (json:Number 3d0) (Nil)))))))
+      (the (Optional (Result (json:Error Unit) json:JSON))
+           (head (iter:collect! (json:parse! (map pure (iter:into-iter "[1, 2, 3] 42 invalid
+
+ \"hello\"
+
+")))))))
+
+  (matches (Err _)
+      (the (Result (json:Error Unit) (List json:JSON))
+           (sequence (iter:collect! (json:parse! (map pure (iter:into-iter "[1, 2, 3] 42 invalid
+
+ \"hello\"
+
+"))))))))
