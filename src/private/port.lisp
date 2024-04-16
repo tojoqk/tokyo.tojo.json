@@ -8,10 +8,7 @@
            #:make!
            #:peek
            #:read!
-           #:peek-or-read!
-
-           #:Error
-           #:ReadError))
+           #:peek-or-read!))
 
 (in-package #:tokyo.tojo.json/private/port)
 
@@ -20,46 +17,35 @@
 (coalton-toplevel
 
   ;; JSON is LL(1) grammar, so it only requires lookahead of one character.
-  (define-type (Port :e) (%Port (Optional Char) (iter:Iterator (Result :e Char))))
+  (define-type Port (%Port (Optional Char) (iter:Iterator Char)))
 
-  (define-type (Error :e)
-    (ReadError :e))
-
-  (declare make! (iter:Iterator (Result :e Char) -> (Result (Error :e) (Port :e))))
+  (declare make! (iter:Iterator Char -> Port))
   (define (make! iter)
-    (match (iter:next! iter)
-      ((Some (Ok c)) (Ok (%Port (Some c) iter)))
-      ((None) (Ok (%Port None iter)))
-      ((Some (Err e)) (Err (ReadError e)))))
+    (%Port (iter:next! iter) iter))
 
-  (declare peek (Port :e -> Result (Error :e) (Optional Char)))
+  (declare peek (Port -> Optional Char))
   (define (peek (%Port opt _))
     (match opt
-      ((Some c) (Ok (Some c)))
-      ((None) (Ok None))))
+      ((Some c) (Some c))
+      ((None)  None)))
 
-  (declare read! (Port :e -> (Result (Error :e) (Optional (Tuple Char (Port :e))))))
+  (declare read! (Port -> (Optional (Tuple Char Port))))
   (define (read! p)
     (match p
-      ((%Port (None) _) (Ok None))
+      ((%Port (None) _) None)
       ((%Port (Some ch) iter)
        (match (iter:next! iter)
-         ((Some (Ok next-ch))
-          (Ok (Some (Tuple ch (%Port (Some next-ch) iter)))))
-         ((None) (Ok (Some (Tuple ch (%Port None iter)))))
-         ((Some (Err e))
-          (Err (ReadError e)))))))
+         ((Some next-ch)
+          (Some (Tuple ch (%Port (Some next-ch) iter))))
+         ((None) (Some (Tuple ch (%Port None iter))))))))
 
-  (declare peek-or-read! ((char -> Boolean) -> Port :e -> Result (Error :e) (Optional (Tuple Char (Port :e)))))
+  (declare peek-or-read! ((char -> Boolean) -> Port -> (Optional (Tuple Char Port))))
   (define (peek-or-read! read? (%Port opt iter))
     (match opt
       ((Some ch)
        (cond ((read? ch)
               (match (iter:next! iter)
-                ((Some (Ok next-ch))
-                 (Ok (Some (Tuple ch (%Port (Some next-ch) iter)))))
-                ((None) (Ok None))
-                ((Some (Err e))
-                 (Err (ReadError e)))))
-             (True (Ok None))))
-      ((None) (Ok None)))))
+                ((Some next-ch)
+                 (Some (Tuple ch (%Port (Some next-ch) iter))))
+                ((None) None)))))
+      ((None) None))))

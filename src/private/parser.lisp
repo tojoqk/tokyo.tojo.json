@@ -8,9 +8,6 @@
    (#:output #:tokyo.tojo.json/private/output-stream)
    (#:port #:tokyo.tojo.json/private/port))
   (:export #:Parser
-           #:Error
-           #:Message
-           #:ReadError
            #:peek-char
            #:peek-char-or-eof
            #:read-char-or-eof
@@ -31,30 +28,17 @@
 (coalton-toplevel
 
   (repr :transparent)
-  (define-type (Parser :e :a)
-    (Parser ((Tuple (port:Port :e) (List output:Stream)) -> Result (Error :e) (Tuple3 :a (port:Port :e) (List output:Stream)))))
+  (define-type (Parser :a)
+    (Parser ((Tuple port:Port (List output:Stream)) -> Result String (Tuple3 :a port:Port (List output:Stream)))))
 
-  (define-type (Error :e)
-    (Message String)
-    (ReadError :e))
-
-  (define-instance (Into (Result (port:Error :e) :a) (Result (Error :e) :a))
-    (define (into r)
-      (result:map-err into r)))
-
-  (define-instance (Into (port:Error :e) (Error :e))
-    (define (into e)
-      (match e
-        ((port:ReadError e) (ReadError e)))))
-
-  (define-instance (Functor (Parser :e))
+  (define-instance (Functor Parser)
     (define (map f (Parser parse!))
       (Parser
        (fn ((Tuple port streams))
          (do ((Tuple3 x port streams) <- (parse! (Tuple port streams)))
              (pure (Tuple3 (f x) port streams)))))))
 
-  (define-instance (Applicative (Parser :e))
+  (define-instance (Applicative Parser)
     (define (pure x)
       (Parser (fn ((Tuple port streams)) (Ok (Tuple3 x port streams)))))
 
@@ -65,7 +49,7 @@
              ((Tuple3 y port streams) <- (parse2! (Tuple port streams)))
              (pure (Tuple3 (op x y) port streams)))))))
 
-  (define-instance (Monad (Parser :e))
+  (define-instance (Monad Parser)
     (define (>>= (Parser parse!) f)
       (Parser
        (fn ((Tuple port streams))
@@ -74,47 +58,47 @@
              ((Tuple3 x port streams) <- (parse! (Tuple port streams)))
              (pure (Tuple3 x port streams)))))))
 
-  (define-instance (MonadFail (Parser :e))
+  (define-instance (MonadFail Parser)
     (define (fail msg)
-      (Parser (const (Err (Message msg))))))
+      (Parser (const (Err msg)))))
 
-  (declare peek-char-or-eof (Parser :e (Optional Char)))
+  (declare peek-char-or-eof (Parser (Optional Char)))
   (define peek-char-or-eof
     (Parser (fn ((Tuple port streams))
-              (do (opt-ch <- (into (port:peek port)))
+              (do (let opt-ch = (port:peek port))
                   (pure (Tuple3 opt-ch port streams))))))
 
-  (declare peek-char (Parser :e Char))
+  (declare peek-char (Parser Char))
   (define peek-char
     (do (opt <- peek-char-or-eof)
         (match opt
           ((Some c) (pure c))
-          ((None) (Parser (const (Err (Message "Unexpected eof"))))))))
+          ((None) (Parser (const (Err "Unexpected eof")))))))
 
-  (declare read-char-or-eof (Parser :e (Optional Char)))
+  (declare read-char-or-eof (Parser (Optional Char)))
   (define read-char-or-eof
     (Parser
      (fn ((Tuple port streams))
-       (do (opt-ch <- (into (port:read! port)))
+       (do (let opt-ch = (port:read! port))
            (match opt-ch
              ((Some (Tuple ch port)) (Ok (Tuple3 (Some ch) port streams)))
              ((None) (Ok (Tuple3 None port streams))))))))
 
-  (declare read-char (Parser :e Char))
+  (declare read-char (Parser Char))
   (define read-char
     (Parser
      (fn ((Tuple port streams))
-       (do (opt-ch <- (into (port:read! port)))
+       (do (let opt-ch = (port:read! port))
            (match opt-ch
              ((Some (Tuple ch port)) (Ok (Tuple3 ch port streams)))
-             ((None) (Err (Message "Unexpected eof"))))))))
+             ((None) (Err "Unexpected eof")))))))
 
-  (declare run! (Parser :e :a -> (port:Port :e) -> Result (Error :e) (Tuple :a (port:Port :e))))
+  (declare run! (Parser :a -> port:Port -> Result String (Tuple :a port:Port)))
   (define (run! (Parser parse!) port)
     (map (fn ((Tuple3 x port _)) (Tuple x port))
          (parse! (Tuple port (singleton (output:make-string-output-stream))))))
 
-  (declare fold-while ((:a -> :c -> Parser :e (Tuple :a (Optional :c))) -> :a -> :c -> Parser :e :a))
+  (declare fold-while ((:a -> :c -> Parser (Tuple :a (Optional :c))) -> :a -> :c -> Parser :a))
   (define (fold-while f acc state)
     (Parser
      (fn ((Tuple port streams))
@@ -139,7 +123,7 @@
                    (cell:read port*)
                    (cell:read streams*))))))
 
-  (declare do-while (Parser :e Boolean -> Parser :e Unit))
+  (declare do-while (Parser Boolean -> Parser Unit))
   (define (do-while p)
     (fold-while (fn ((Unit) (Unit))
                   (do (b <- p)
@@ -153,7 +137,7 @@
   ;; String Buffer feature
   ;;
 
-  (declare push-new-buffer (Parser :e Unit))
+  (declare push-new-buffer (Parser Unit))
   (define push-new-buffer
     (Parser
      (fn ((Tuple port streams))
@@ -162,7 +146,7 @@
                    (Cons (output:make-string-output-stream)
                          streams))))))
 
-  (declare pop-string (Parser :e String))
+  (declare pop-string (Parser String))
   (define pop-string
     (Parser
      (fn ((Tuple port streams))
@@ -170,9 +154,9 @@
          ((Cons s ss)
           (Ok (Tuple3 (output:get-output-stream-string s) port ss)))
          ((Nil)
-          (Err (Message "pop-buffer: String buffer stack undeflow")))))))
+          (Err "pop-buffer: String buffer stack undeflow"))))))
 
-  (declare write-char (Char -> Parser :e Unit))
+  (declare write-char (Char -> Parser Unit))
   (define (write-char ch)
     (Parser
      (fn ((Tuple port streams))
@@ -181,9 +165,9 @@
           (output:write-char ch stream)
           (Ok (Tuple3 Unit port streams)))
          ((Nil)
-          (Err (Message "write-char: No string buffer")))))))
+          (Err "write-char: No string buffer"))))))
 
-  (declare write-string (String -> Parser :e Unit))
+  (declare write-string (String -> Parser Unit))
   (define (write-string str)
     (Parser
      (fn ((Tuple port streams))
@@ -192,4 +176,4 @@
           (output:write-string str stream)
           (Ok (Tuple3 Unit port streams)))
          ((Nil)
-          (Err (Message "write-string: No string buffer"))))))))
+          (Err "write-string: No string buffer")))))))
