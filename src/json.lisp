@@ -3,7 +3,8 @@
         #:coalton-prelude)
   (:shadow #:String
            #:True
-           #:False)
+           #:False
+           #:Error)
   (:local-nicknames
    (#:map #:coalton-library/ord-map)
    (#:iter #:coalton-library/iterator)
@@ -13,6 +14,7 @@
    (#:list #:coalton-library/list)
    (#:result #:coalton-library/result)
    (#:cell #:coalton-library/cell)
+   (#:builtin #:coalton-library/builtin)
    (#:output #:tokyo.tojo.json/private/output-stream)
    (#:port #:tokyo.tojo.json/private/port)
    (#:parser #:tokyo.tojo.json/private/parser))
@@ -467,7 +469,7 @@
                                  (comma-next j (Zipper j (CrumbArray cr (Cons x l) r)) Continue-Parse-Array)))
                             (coalton:True
                              (fail-unexpected-char ch)))))
-                     (_ (error "zipper-parser: program error (Continue-Parse-Array)"))))
+                     (_ (builtin:error "zipper-parser: program error (Continue-Parse-Array)"))))
                   ((Start-Parse-Object)
                    (do skip-whitespaces
                        (ch <- parser:peek-char)
@@ -499,7 +501,7 @@
                                              Continue-Parse-Object)))
                             (coalton:True
                              (fail-unexpected-char ch)))))
-                     (_ (error "zipper-parser: program error (Continue-Parse-Object)")))))))))
+                     (_ (builtin:error "zipper-parser: program error (Continue-Parse-Object)")))))))))
       (do (z <- (map to-zipper shallow-json-parser))
           (match z
             ((Zipper (Null) _) (pure z))
