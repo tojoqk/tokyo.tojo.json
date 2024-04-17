@@ -117,6 +117,21 @@
       (the (Result String json:JSON)
            (tryInto "{\"test\" : 42,}"))))
 
+
+(define-test parse-contains-extra-characters-test ()
+  (matches (Ok _)
+      (the (Result String json:JSON)
+           (tryInto "{\"ok\": 42}")))
+  (matches (OK _)
+      (the (Result String json:JSON)
+           (tryInto "{\"ok\": 42}     ")))
+  (matches (Err _)
+      (the (Result String json:JSON)
+           (tryInto "{\"ok\": 42}    invalid")))
+  (matches (Err _)
+      (the (Result String json:JSON)
+           (tryInto "{\"ok\": 42}    []"))))
+
 (define-test parse-multiple-jsons ()
   (matches (Ok (Cons (json:Array (Cons (json:Number 1d0)
                                        (Cons (json:Number 2d0)

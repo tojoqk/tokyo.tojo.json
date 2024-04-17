@@ -523,7 +523,13 @@
     "Parse the JSON string `STR`.
 
 Returns a JSON type object if successful, otherwise returns an error message."
-    (map fst (parser:run! json-parser (port:make! (iter:into-iter str)))))
+    (let parser = (do (json <- json-parser)
+                      skip-whitespaces
+                      (opt-ch <- parser:peek-char-or-eof)
+                      (match opt-ch
+                        ((Some _) (fail "Contains extra characters at the end"))
+                        ((None) (pure json)))))
+    (map fst (parser:run! parser (port:make! (iter:into-iter str)))))
 
   (declare parse! (iter:Iterator Char -> Iterator (Result coalton:String JSON)))
   (define (parse! iter)
