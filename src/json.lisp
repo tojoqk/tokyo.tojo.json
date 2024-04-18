@@ -214,7 +214,7 @@
 
   (declare take-parser (UFix -> (parser:Parser coalton:String)))
   (define (take-parser n)
-    (map into (sequence (list:repeat n parser:peek-char))))
+    (map into (sequence (list:repeat n parser:read-char))))
 
   (declare string-parser (parser:Parser coalton:String))
   (define string-parser
