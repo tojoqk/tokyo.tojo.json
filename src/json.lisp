@@ -107,8 +107,11 @@
   (define (message-with msg c)
     (<> msg (<> ": " (into c))))
 
+  (define (unexpected-char c)
+    (message-with "Unexpected char" (singleton c)))
+
   (define (fail-unexpected-char c)
-    (fail (message-with "Unexpected char" (singleton c))))
+    (fail (unexpected-char c)))
 
   (define (fail-unexpected-string str)
     (fail (message-with "Unexpected string" str)))
@@ -216,6 +219,38 @@
   (define (take-parser n)
     (map into (sequence (list:repeat n parser:read-char))))
 
+  (define (from-optional str opt)
+    (match opt
+      ((Some x) (pure x))
+      ((None) (fail str))))
+
+  (define (guard msg b)
+    (if b
+        (pure Unit)
+        (fail msg)))
+
+  (declare ufix-to-str (UFix -> coalton:String))
+  (define (ufix-to-str hex)
+    (into (the Integer (into hex))))
+
+  (declare code-point-out-of-range (UFix -> coalton:String))
+  (define (code-point-out-of-range x)
+    (lisp coalton:String (x)
+      (cl:format nil "Code point out of range: \\u~x" x)))
+
+  (define (write-surrogate-pair-parser heigh)
+    (do (let msg = (code-point-out-of-range heigh))
+        (u <- (take-parser 2))
+        (guard msg (== u "\\u"))
+        (low-str <- (take-parser 4))
+        (low <- (from-optional msg (parse-hex low-str)))
+        (guard msg (and (<= #xDC00 low) (<= low #xDFFF)))
+        (let code = (surrogate-pair-code heigh low))
+        (let msg = (code-point-out-of-range code))
+        (guard msg (and (<= #x10000 code) (<= code #x10FFFF)))
+        (ch <- (from-optional msg (char:code-char code)))
+        (parser:write-char ch)))
+
   (declare string-parser (parser:Parser coalton:String))
   (define string-parser
     (let ((declare write-escaped-char-parser (parser:Parser Unit))
@@ -223,18 +258,16 @@
             (do (ch <- parser:read-char)
                 (cond ((== ch #\u)
                        (do (str <- (take-parser 4))
-                           (match (>>= (parse-hex str)
-                                       char:code-char)
-                             ((None)
-                              (fail-unexpected-string str))
-                             ((Some ch)
-                              (parser:write-char ch)))))
+                           (code <- (from-optional "" (parse-hex str)))
+                           (let msg = (code-point-out-of-range code))
+                           (guard msg (not (and (<= #xDC00 code) (<= code #xDFFF)))) ; low of surrogate pair
+                           (if (and (<= #xD800 code) (<= code #xDBFF))
+                               (write-surrogate-pair-parser code)
+                               (do (ch <- (from-optional msg (char:code-char code)))
+                                   (parser:write-char ch)))))
                       (coalton:True
-                       (match (map:lookup escape-char-map ch)
-                         ((Some ch)
-                          (parser:write-char ch))
-                         ((None)
-                          (fail-unexpected-char ch)))))))
+                       (do (ch <- (from-optional (unexpected-char ch) (map:lookup escape-char-map ch)))
+                           (parser:write-char ch))))))
           (declare write-substring (parser:Parser Unit))
           (write-substring
             (do (ch <- parser:peek-char)
