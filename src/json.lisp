@@ -113,8 +113,11 @@
   (define (fail-unexpected-char c)
     (fail (unexpected-char c)))
 
+  (define (unexpected-string str)
+    (message-with "Unexpected string" str))
+
   (define (fail-unexpected-string str)
-    (fail (message-with "Unexpected string" str)))
+    (fail (unexpected-string str)))
 
   (define (whitespace? c)
     (or (== c #\return)
@@ -146,9 +149,9 @@
 
   (define (non-empty-string parser)
     (do (str <- parser)
-        (if (< 0 (str:length str))
-            (pure str)
-            (fail "Unexpected empty symbol"))))
+        (guard "Unexpected empty symbol"
+               (< 0 (str:length str)))
+        (pure str)))
 
   (define (write-take-until end?)
     (parser:do-while (do (opt-ch <- parser:peek-char-or-eof)
@@ -179,24 +182,21 @@
   (declare null-parser (parser:Parser Unit))
   (define null-parser
     (do (word <- (non-empty-string word-parser))
-        (if (== word "null")
-            (pure Unit)
-            (fail-unexpected-string word))))
+        (guard (unexpected-string word)
+               (== word "null"))
+        (pure Unit)))
 
   (declare true-parser (parser:Parser Boolean))
   (define true-parser
     (do (word <- (non-empty-string word-parser))
-        (if (== word "true")
-            (pure coalton:True)
-            (fail-unexpected-string word))))
+        (guard (unexpected-string word) (== word "true"))
+        (pure coalton:True)))
 
   (declare false-parser (parser:Parser Boolean))
   (define false-parser
     (do (word <- (non-empty-string word-parser))
-        (if (== word "false")
-            (pure coalton:False)
-            (fail-unexpected-string word))))
-
+        (guard (unexpected-string word) (== word "false"))
+        (pure coalton:False)))
   (declare escape-char-map (map:Map Char Char))
   (define escape-char-map
     (foldr (fn ((Tuple k v) acc)
@@ -288,25 +288,22 @@
 
   (declare digits-parser (parser:Parser coalton:String))
   (define digits-parser
-    (let length>0-check =
-      (fn (str)
-        (if (< 0 (str:length str))
-            (pure str)
-            (fail "Unexpected empty symbol"))))
     (do parser:push-new-buffer
         (write-take-until (complement digit?))
         (str <- parser:pop-string)
         (opt-ch <- parser:peek-char-or-eof)
         (match opt-ch
-          ((None) (length>0-check str))
+          ((None)
+           (do (guard "Unexpected empty symbol" (< 0 (str:length str)))
+               (pure str)))
           ((Some ch)
-           (cond ((or (sep? ch)
-                      (== ch #\.)
-                      (== ch #\e)
-                      (== ch #\E))
-                  (length>0-check str))
-                 (coalton:True
-                  (fail-unexpected-char ch)))))))
+           (do (guard (unexpected-char ch)
+                      (or (sep? ch)
+                          (== ch #\.)
+                          (== ch #\e)
+                          (== ch #\E)))
+               (guard "Unexpected empty symbol" (< 0 (str:length str)))
+               (pure str))))))
 
   (declare parse-float (coalton:String -> (Optional Double-Float)))
   (define (parse-float str)
@@ -332,9 +329,8 @@
                   (parser:write-string "d")
                   (parser:write-string exponent)
                   (float-string <- parser:pop-string)
-                  (match (parse-float float-string)
-                    ((Some float) (pure float))
-                    ((None) (fail-unexpected-string (mconcat (make-list head "." fraction "e" exponent))))))))
+                  (from-optional (unexpected-string (mconcat (make-list head "." fraction "e" exponent)))
+                                 (parse-float float-string)))))
 
           (declare head-parser (parser:Parser coalton:String))
           (head-parser
@@ -352,9 +348,9 @@
                         (cond
                           ((== ch #\0)
                            (do (digits <- digits-parser)
-                               (if (== digits "0")
-                                   (pure digits)
-                                   (fail-unexpected-string digits))))
+                               (guard (unexpected-string digits)
+                                      (== digits "0"))
+                               (pure digits)))
                           ((digit1-9? ch) digits-parser)
                           (coalton:True
                            (fail-unexpected-char ch))))))
