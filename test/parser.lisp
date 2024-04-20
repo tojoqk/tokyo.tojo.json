@@ -54,7 +54,10 @@
 (define-test parse-string-test ()
   (matches (Ok (json:String "hello"))
       (the (Result String json:JSON)
-           (tryInto "\"hello\""))))
+           (tryInto "\"hello\"")))
+  (matches (Ok (json:String " [𩸽] [😎] "))
+      (the (Result String json:JSON)
+           (tryInto "\" [\\ud867\\ude3d\] [\\uD83D\\uDE0E] \""))))
 
 (define-test parse-array-test ()
   (is (pipe "[\"hello\", 3, true, false  ]"
