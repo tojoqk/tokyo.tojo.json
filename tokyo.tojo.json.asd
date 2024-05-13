@@ -3,12 +3,10 @@
   :author "Masaya Tojo"
   :license  "MIT"
   :version "0.0.0"
-  :depends-on (#:coalton #:alexandria)
+  :depends-on (#:coalton #:alexandria #:tokyo.tojo.parser)
   :serial t
   :pathname "src/"
   :components ((:file "private/output-stream")
-               (:file "private/port")
-               (:file "private/parser")
                (:file "json"))
   :in-order-to ((test-op (test-op "tokyo.tojo.json/test"))))
 

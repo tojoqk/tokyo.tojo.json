@@ -23,8 +23,8 @@ A representation of a JSON object.
 
 ### Values
 
-#### <code>(PARSE! ITER)</code> <sup><sub>FUNCTION</sub></sup><a name="parse!-value"></a>
-<code>((<a href="#iterator-type">ITERATOR</a> <a href="#char-type">CHAR</a>) &rarr; (<a href="#iterator-type">ITERATOR</a> (<a href="#result-type">RESULT</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>)))</code>
+#### <code>(PARSE! SOURCE)</code> <sup><sub>FUNCTION</sub></sup><a name="parse!-value"></a>
+<code>&forall; :A :B. <a href="#intoport-class">INTOPORT</a> :B :A &rArr; (:B &rarr; (<a href="#iterator-type">ITERATOR</a> (<a href="#result-type">RESULT</a> <a href="#string-type">STRING</a> <a href="#json-type">JSON</a>)))</code>
 
 Create an iterator for JSON objects from the character iterator ITER, which contains JSON data.
 
