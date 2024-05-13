@@ -11,8 +11,8 @@ https://github.com/coalton-lang/coalton
 Next, place `tokyo.tojo.parser` and `tokyo.tojo.json` in your local repository (`~/common-lisp`, etc.).
 
 ```shell:~/common-lisp
-git clone https://github.com/tojoqk/tokyo.tojo.parser.git tokyo.tojo.parser
-git clone https://github.com/tojoqk/tokyo.tojo.json.git tokyo.tojo.json
+git clone https://github.com/tojoqk/tokyo.tojo.parser.git
+git clone https://github.com/tojoqk/tokyo.tojo.json.git
 ```
 
 If you are using Quicklisp, you can load the system with the following.
