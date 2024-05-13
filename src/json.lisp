@@ -238,6 +238,12 @@
     (lisp coalton:String (x)
       (cl:format nil "Code point out of range: \\u~x" x)))
 
+  (declare surrogate-pair-code (UFix -> UFix -> UFix))
+  (define (surrogate-pair-code heigh low)
+    (+ #x10000
+       (+ (* (- heigh #xD800) #x400)
+          (- low #xDC00))))
+
   (define (write-surrogate-pair-parser heigh)
     (do (let msg = (code-point-out-of-range heigh))
         (u <- (take-parser 2))
