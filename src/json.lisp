@@ -15,7 +15,8 @@
    (#:cell #:coalton-library/cell)
    (#:output #:tokyo.tojo.json/private/output-stream)
    (#:port #:tokyo.tojo.parser/port)
-   (#:parser #:tokyo.tojo.parser/parser))
+   (#:parser #:tokyo.tojo.parser/parser)
+   (#:iterable #:tokyo.tojo.iterable))
   (:export #:JSON
            #:Null
            #:True
@@ -432,106 +433,108 @@
                   (coalton:True
                    (fail-unexpected-char c)))))
           (deep-parser
-            (fn (z state)
+            (fn ((Tuple z state))
               (let ((key-value-parser
                       (do (key <- string-parser)
                           skip-whitespaces
-                          (ch <- parser:peek-char)
-                          (match ch
-                            (#\:
-                             (do parser:read-char
-                                 (value <- shallow-json-parser)
-                                 skip-whitespaces
-                                 (pure (Tuple key value))))
-                            (_ (fail-unexpected-char ch)))))
+                        (ch <- parser:peek-char)
+                        (match ch
+                          (#\:
+                           (do parser:read-char
+                               (value <- shallow-json-parser)
+                            skip-whitespaces
+                             (pure (Tuple key value))))
+                          (_ (fail-unexpected-char ch)))))
                     (empty-next
                       (fn ()
                         (match z
                           ((Zipper _ (CrumbTop))
-                           (pure (Tuple z None)))
+                           (pure (iterable:Return (Tuple z state))))
                           ((Zipper _ (CrumbArray _ _ _))
-                           (pure (Tuple z (Some Continue-Parse-Array))))
+                           (pure (iterable:Continue (Tuple z Continue-Parse-Array))))
                           ((Zipper _ (CrumbObject _ _ _ _))
-                           (pure (Tuple z (Some Continue-Parse-Object)))))))
+                           (pure (iterable:Continue (Tuple z Continue-Parse-Object)))))))
                     (end-next
                       (fn (new-zipper)
                         (match new-zipper
                           ((Zipper _ (CrumbTop))
-                           (pure (Tuple new-zipper None)))
+                           (pure (iterable:Return (Tuple new-zipper state))))
                           ((Zipper _ (CrumbArray _ _ _))
-                           (pure (Tuple new-zipper (Some Continue-Parse-Array))))
+                           (pure (iterable:Continue (Tuple new-zipper Continue-Parse-Array))))
                           ((Zipper _ (CrumbObject _ _ _ _))
-                           (pure (Tuple new-zipper (Some Continue-Parse-Object)))))))
+                           (pure (iterable:Continue (Tuple new-zipper Continue-Parse-Object)))))))
                     (comma-next
                       (fn (json new-zipper next-state)
-                        (let ((continue (pure (Tuple new-zipper (Some next-state)))))
+                        (let ((continue (pure (iterable:Continue (Tuple new-zipper next-state)))))
                           (match json
                             ((Null) continue)
                             ((True) continue)
                             ((False) continue)
                             ((Number _) continue)
                             ((String _) continue)
-                            ((Array _) (pure (Tuple new-zipper (Some Start-Parse-Array))))
-                            ((Object _) (pure (Tuple new-zipper (Some Start-Parse-Object)))))))))
+                            ((Array _) (pure
+                                        (iterable:Continue (Tuple new-zipper Start-Parse-Array))))
+                            ((Object _) (pure
+                                         (iterable:Continue (Tuple new-zipper Start-Parse-Object)))))))))
                 (match state
                   ((Start-Parse-Array)
                    (do skip-whitespaces
                        (ch <- parser:peek-char)
-                       (cond
-                         ((== ch #\])
-                          (do parser:read-char
-                              (empty-next)))
-                         (coalton:True
-                          (do (let (Zipper _ cr) = z)
-                              (j <- shallow-json-parser)
-                              (comma-next j (Zipper j (CrumbArray cr Nil Nil)) Continue-Parse-Array))))))
+                     (cond
+                       ((== ch #\])
+                        (do parser:read-char
+                            (empty-next)))
+                       (coalton:True
+                        (do (let (Zipper _ cr) = z)
+                            (j <- shallow-json-parser)
+                          (comma-next j (Zipper j (CrumbArray cr Nil Nil)) Continue-Parse-Array))))))
                   ((Continue-Parse-Array)
                    (match z
                      ((Zipper x (CrumbArray cr l r))
                       (do skip-whitespaces
                           (ch <- parser:peek-char)
-                          (cond
-                            ((== ch #\])
-                             (do parser:read-char
-                                 (end-next (Zipper (Array (append (reverse l) (Cons x r))) cr))))
-                            ((== ch #\,)
-                             (do parser:read-char
-                                 (j <- shallow-json-parser)
-                                 (comma-next j (Zipper j (CrumbArray cr (Cons x l) r)) Continue-Parse-Array)))
-                            (coalton:True
-                             (fail-unexpected-char ch)))))
+                        (cond
+                          ((== ch #\])
+                           (do parser:read-char
+                               (end-next (Zipper (Array (append (reverse l) (Cons x r))) cr))))
+                          ((== ch #\,)
+                           (do parser:read-char
+                               (j <- shallow-json-parser)
+                             (comma-next j (Zipper j (CrumbArray cr (Cons x l) r)) Continue-Parse-Array)))
+                          (coalton:True
+                           (fail-unexpected-char ch)))))
                      (_ (error "zipper-parser: program error (Continue-Parse-Array)"))))
                   ((Start-Parse-Object)
                    (do skip-whitespaces
                        (ch <- parser:peek-char)
-                       (cond
-                         ((== ch #\})
-                          (do parser:read-char
-                              (empty-next)))
-                         (coalton:True
-                          (do (let (Zipper _ cr) = z)
-                              ((Tuple key j) <- key-value-parser)
-                              (comma-next j
-                                          (Zipper j (CrumbObject cr key Nil Nil))
-                                          Continue-Parse-Object))))))
+                     (cond
+                       ((== ch #\})
+                        (do parser:read-char
+                            (empty-next)))
+                       (coalton:True
+                        (do (let (Zipper _ cr) = z)
+                            ((Tuple key j) <- key-value-parser)
+                          (comma-next j
+                                      (Zipper j (CrumbObject cr key Nil Nil))
+                                      Continue-Parse-Object))))))
                   ((Continue-Parse-Object)
                    (match z
                      ((Zipper x (CrumbObject cr xk l r))
                       (do skip-whitespaces
                           (ch <- parser:peek-char)
-                          (cond
-                            ((== ch #\})
-                             (do parser:read-char
-                                 (end-next (Zipper (make-object (append (reverse l) (Cons (Tuple xk x) r))) cr))))
-                            ((== ch #\,)
-                             (do parser:read-char
-                                 skip-whitespaces
-                                 ((Tuple key j) <- key-value-parser)
-                                 (comma-next j
-                                             (Zipper j (CrumbObject cr key (Cons (Tuple xk x) l) r))
-                                             Continue-Parse-Object)))
-                            (coalton:True
-                             (fail-unexpected-char ch)))))
+                        (cond
+                          ((== ch #\})
+                           (do parser:read-char
+                               (end-next (Zipper (make-object (append (reverse l) (Cons (Tuple xk x) r))) cr))))
+                          ((== ch #\,)
+                           (do parser:read-char
+                               skip-whitespaces
+                             ((Tuple key j) <- key-value-parser)
+                             (comma-next j
+                                         (Zipper j (CrumbObject cr key (Cons (Tuple xk x) l) r))
+                                         Continue-Parse-Object)))
+                          (coalton:True
+                           (fail-unexpected-char ch)))))
                      (_ (error "zipper-parser: program error (Continue-Parse-Object)")))))))))
       (do (z <- (map to-zipper shallow-json-parser))
           (match z
@@ -541,9 +544,9 @@
             ((Zipper (Number _) _) (pure z))
             ((Zipper (String _) _) (pure z))
             ((Zipper (Array _) _)
-             (parser:fold-while deep-parser z Start-Parse-Array))
+             (map fst (iterable:iterate deep-parser (Tuple z Start-Parse-Array))))
             ((Zipper (Object _) _)
-             (parser:fold-while deep-parser z Start-Parse-Object))))))
+             (map fst (iterable:iterate deep-parser (Tuple z Start-Parse-Object))))))))
 
   (declare json-parser (port:Port :p => parser:Parser :p JSON))
   (define json-parser
